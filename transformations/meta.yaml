@@ -1,0 +1,40 @@
+{% set name = "transformations" %}
+{% set version = "2021.6.6" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  url: "https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz"
+  sha256: a418c92a647d3210d929ab0d1db695545ca369f5da72fdae8a9976c189aec2c5
+
+build:
+  number: 0
+  script: "{{ PYTHON }} -m pip install . -vv"
+
+requirements:
+  host:
+    - numpy >=1.15.1
+    - pip
+    - python
+  run:
+    - numpy >=1.15.1
+    - python
+
+test:
+  imports:
+    - transformations
+
+about:
+  home: "https://www.lfd.uci.edu/~gohlke/"
+  license: BSD
+  license_family: BSD
+  license_file: 
+  summary: "Homogeneous Transformation Matrices and Quaternions"
+  doc_url: 
+  dev_url: 
+
+extra:
+  recipe-maintainers:
+    - your-github-id-here
