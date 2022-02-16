@@ -48,17 +48,18 @@ class Simulator:
             omega.append(np.array([0, 0, 0]))
             F.append(np.array([0, 0, 0]))
             T.append(np.array([0, 0, 0]))
+        # here dtype is neccessary on Metal, Metal is only-support 32-bit data
         return {
-            "pos": np.array(pos),
-            "rot": np.array(rot),
-            "mass": np.array(m),
-            "inv_I": np.array(inv_I),
-            "linear_m": np.array(linear_m),
-            "angular_m": np.array(angular_m),
-            "v": np.array(v),
-            "w": np.array(omega),
-            "F": np.array(F),
-            "T": np.array(T),
+            "pos": np.array(pos, dtype=np.float32),
+            "rot": np.array(rot, dtype=np.float32),
+            "mass": np.array(m, dtype=np.float32),
+            "inv_I": np.array(inv_I, dtype=np.float32),
+            "linear_m": np.array(linear_m, dtype=np.float32),
+            "angular_m": np.array(angular_m, dtype=np.float32),
+            "v": np.array(v, dtype=np.float32),
+            "w": np.array(omega, dtype=np.float32),
+            "F": np.array(F, dtype=np.float32),
+            "T": np.array(T, dtype=np.float32),
         }
 
     @ti.kernel

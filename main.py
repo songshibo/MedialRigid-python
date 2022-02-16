@@ -1,4 +1,4 @@
-from distutils.log import Log
+from matplotlib import backends
 import polyscope as ps
 import polyscope.imgui as psimgui
 import os
@@ -7,11 +7,10 @@ from util import *
 from engine import *
 import taichi as ti
 
-ti.init(arch=ti.gpu)
+ti.init(arch=ti.gpu, debug=True)
 
 dt = 0.01
 objects = []  # all active objects in scenes
-
 
 root_path = os.getcwd()
 ps_config = read_configs(

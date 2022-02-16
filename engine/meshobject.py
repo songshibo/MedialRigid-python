@@ -31,7 +31,6 @@ class MeshObject:
     def __init__(self, name: str, path: str, position, rotation, index, polyscope) -> None:
         self.name = name
         self.index = index
-        info("Object: {} Index: {}".format(self.name, self.index))
         v, f = igl.read_triangle_mesh(path)
         self.mesh = polyscope.register_surface_mesh(self.name, v, f)
         self.position = position
@@ -42,9 +41,7 @@ class MeshObject:
         self.mesh.set_transform(self.TRS)
 
         self.mass_center = compute_mass_center(v)
-        # info("[{}] Center of Mass: {}".format(self.name, self.mass_center))
         self.inertia = compute_inertia_const_density(v, f, self.mass_center)
-        # info("[{}] Inertia Tensor: \n{}".format(self.name, self.inertia))
 
     def compute_transform(self):
         self.TRS = TRS(self.position, self.orientation, self.scale)
