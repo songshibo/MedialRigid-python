@@ -1,5 +1,5 @@
 import numpy as np
-from transformations import euler_matrix, quaternion_matrix, concatenate_matrices, quaternion_from_euler, is_same_transform
+from transformations import euler_matrix, quaternion_matrix, concatenate_matrices, quaternion_from_euler, is_same_transform, quaternion_multiply
 
 
 def identity():

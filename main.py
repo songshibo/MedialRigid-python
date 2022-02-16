@@ -1,7 +1,27 @@
+from asyncio.log import logger
+from distutils.log import Log
 import polyscope as ps
+import polyscope.imgui as psim
 import os
 from util import *
 from engine import *
+
+dt = 0.01
+objects = []  # all active objects in scenes
+
+
+def advance():
+    psim.PushItemWidth(50)
+    if psim.Button("Advance"):
+        for obj in objects:
+            obj.position += np.array((0, -9.8, 0)) * dt
+            obj.rotate(np.array((180, 0, 180)) * dt)
+            obj.advance()
+            info("Object:{}\t Position:{}\t Rotation:{}".format(
+                obj.name, obj.position, obj.orientation))
+
+    psim.PopItemWidth()
+
 
 root_path = os.getcwd()
 ps_config = read_configs(
@@ -29,7 +49,6 @@ ps.set_ground_plane_mode(ps_config['scene']['ground_mode'])
 ########################
 ## Object preparation ##
 ########################
-objects = []  # all active objects in scenes
 for obj_name in scene_config.sections():
     path = scene_config[obj_name]['path']
     position = read_np_array(scene_config[obj_name]['position'], np.float32)
@@ -38,5 +57,5 @@ for obj_name in scene_config.sections():
 
 
 ps.init()
-
+ps.set_user_callback(advance)
 ps.show()

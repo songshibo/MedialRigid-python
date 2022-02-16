@@ -12,9 +12,15 @@ class MeshObject:
         self.orientation = euler_to_quaternion(rotation)
         self.scale = self.mesh.get_transform().diagonal()[:3]
         self.TRS = identity()
-        self.compute_transform()
+        self.advance()
 
-        self.mesh.set_transform(self.TRS)
+    def rotate(self, euler):
+        q = euler_to_quaternion(euler)
+        self.orientation = quaternion_multiply(self.orientation, q)
 
     def compute_transform(self):
         self.TRS = TRS(self.position, self.orientation, self.scale)
+
+    def advance(self):
+        self.compute_transform()
+        self.mesh.set_transform(self.TRS)
