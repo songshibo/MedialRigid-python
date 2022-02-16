@@ -1,26 +1,16 @@
-from asyncio.log import logger
 from distutils.log import Log
 import polyscope as ps
-import polyscope.imgui as psim
+import polyscope.imgui as psimgui
 import os
+from engine.simulator import Simulator
 from util import *
 from engine import *
+import taichi as ti
+
+ti.init(arch=ti.gpu)
 
 dt = 0.01
 objects = []  # all active objects in scenes
-
-
-def advance():
-    psim.PushItemWidth(50)
-    if psim.Button("Advance"):
-        for obj in objects:
-            obj.position += np.array((0, -9.8, 0)) * dt
-            obj.rotate(np.array((180, 0, 180)) * dt)
-            obj.advance()
-            info("Object:{}\t Position:{}\t Rotation:{}".format(
-                obj.name, obj.position, obj.orientation))
-
-    psim.PopItemWidth()
 
 
 root_path = os.getcwd()
@@ -53,9 +43,25 @@ for obj_name in scene_config.sections():
     path = scene_config[obj_name]['path']
     position = read_np_array(scene_config[obj_name]['position'], np.float32)
     rotation = read_np_array(scene_config[obj_name]['rotation'], np.float32)
-    objects.append(MeshObject(obj_name, path, position, rotation, ps))
+    objects.append(MeshObject(obj_name, path, position,
+                   rotation, len(objects), ps))
+
+sim = Simulator(dt, objects)
+
+
+def callback():
+    psimgui.PushItemWidth(150)
+
+    if(psimgui.Button("Advance")):
+        sim.update()
+        # read back to polyscope
+        result = sim.rigidbodies.to_numpy()
+        for obj in objects:
+            obj.update_transform(result)
+
+    psimgui.PopItemWidth()
 
 
 ps.init()
-ps.set_user_callback(advance)
+ps.set_user_callback(callback)
 ps.show()
