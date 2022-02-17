@@ -43,7 +43,7 @@ for obj_name in scene_config.sections():
     position = read_np_array(scene_config[obj_name]['position'], np.float32)
     rotation = read_np_array(scene_config[obj_name]['rotation'], np.float32)
     obj = MeshObject(obj_name, path, position, rotation, len(objects), ps)
-    obj.load_ma(scene_config[obj_name]['ma_path'])
+    obj.load_ma(scene_config.get(obj_name, "ma_path", fallback=""))
     objects.append(obj)
 
 sim = Simulator(dt, objects)

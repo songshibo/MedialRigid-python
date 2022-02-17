@@ -1,5 +1,6 @@
 import igl
 from util import *
+from os.path import exists
 
 
 def compute_mass_center(v):
@@ -50,6 +51,9 @@ class MeshObject:
         self.ma_faces = None
 
     def load_ma(self, filepath):
+        if not exists(filepath):
+            print("Object {} has no related ma file.".format(self.name))
+            return
         file = open(filepath, 'r')
         first_line = file.readline().rstrip()
         vcount, ecount, fcount = [int(x) for x in first_line.split()]
