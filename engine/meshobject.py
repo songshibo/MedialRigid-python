@@ -3,7 +3,7 @@ from util import *
 from os.path import exists
 
 
-def compute_mass_center(v, f):
+def compute_mass_center(v):
     return np.mean(v, axis=0)
 
 
@@ -16,9 +16,9 @@ def compute_inertia_const_density(v, f, center, scale):
     C_sum = np.zeros([3, 3])
     for tri in f:
         # compute Covariance of each tetrahedron
-        v1 = v[tri[0], :] * scale[0]
-        v2 = v[tri[1], :] * scale[1]
-        v3 = v[tri[2], :] * scale[2]
+        v1 = v[tri[0], :]
+        v2 = v[tri[1], :]
+        v3 = v[tri[2], :]
         A = np.zeros([3, 3])
         A[:, 0] = v1 - center
         A[:, 1] = v2 - center

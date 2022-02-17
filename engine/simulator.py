@@ -48,7 +48,7 @@ class Simulator:
             v.append(np.array([0, 0, 0]))
             omega.append(np.array([0, 0, 0]))
             F.append(np.array([0, 0, 0]))
-            T.append(np.array([0, 0, 0]))
+            T.append(np.array([1, 0, 0]))
         # here dtype is neccessary on Metal, Metal is only-support 32-bit data
         return {
             "pos": np.array(pos, dtype=np.float32),
