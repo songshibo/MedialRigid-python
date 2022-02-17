@@ -11,7 +11,7 @@ mat3 = ti.types.matrix(3, 3, ti.f32)
 
 @ti.data_oriented
 class Simulator:
-    def __init__(self, dt, objects) -> None:
+    def __init__(self, dt, objects):
         self.dt = dt
         self.n = len(objects)
         rigidbodies_dict = self.prepare_data(
@@ -47,7 +47,7 @@ class Simulator:
             v.append(np.array([0, 0, 0]))
             omega.append(np.array([0, 0, 0]))
             F.append(np.array([0, 0, 0]))
-            T.append(np.array([100, 0, 0]))
+            T.append(np.array([0, 0, 0]))
         # here dtype is neccessary on Metal, Metal is only-support 32-bit data
         return {
             "pos": np.array(pos, dtype=np.float32),

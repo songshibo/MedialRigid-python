@@ -39,7 +39,9 @@ def TRS(_position, _orientation, _scale):
     T = translate(_position)
     # Quaternions w+ix+jy+kz are represented as [w,x,y,z] in transformations
     # while we use [x,y,z,w], so here we need a simple swap to make sure orientation is in [w,x,y,z]
-    _orientation[1:4], _orientation[0] = _orientation[:3], _orientation[3]
-    R = quaternion_matrix(_orientation)
+    # _orientation[1:4], _orientation[0] = _orientation[:3], _orientation[3]
+    q = np.array([_orientation[3], _orientation[0],
+                 _orientation[1], _orientation[2]])
+    R = quaternion_matrix(q)
     S = scale(_scale)
     return concatenate_matrices(T, R, S)

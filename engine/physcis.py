@@ -30,11 +30,10 @@ def quaternion_to_mat3(q):
 def advance(rb, dt):
     rb.linear_m += rb.F * dt + g * rb.mass * dt
     rb.angular_m += rb.T * dt
-
     # linear velocity
     rb.v = rb.linear_m / rb.mass
     # angular velocity
-    R = quaternion_to_mat3(ts.normalize(rb.rot))
+    R = quaternion_to_mat3(rb.rot)
     rb.w = R @ rb.inv_I @ R.transpose() @ rb.angular_m
     qdot = quaternion_multiply(
         ti.Vector([rb.w.x, rb.w.y, rb.w.z, 0])*0.5, rb.rot)
