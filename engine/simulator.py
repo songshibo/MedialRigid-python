@@ -2,7 +2,7 @@ import taichi as ti
 import taichi_glsl as ts
 import numpy as np
 
-from engine.physcis import advance, quaternion_multiply, quaternion_to_mat3
+from engine.physcis import advance
 
 vec3 = ti.types.vector(3, ti.f32)
 vec4 = ti.types.vector(4, ti.f32)
@@ -12,7 +12,8 @@ mat3 = ti.types.matrix(3, 3, ti.f32)
 @ti.data_oriented
 class Simulator:
     def __init__(self, dt, objects):
-        self.dt = dt
+        self.dt = ti.field(ti.f32, shape=())
+        self.dt[None] = dt
         self.n = len(objects)
         rigidbodies_dict = self.prepare_data(
             objects)
@@ -64,8 +65,9 @@ class Simulator:
 
     @ti.kernel
     def update(self):
+        print(self.dt[None])
         for i in range(self.n):
-            self.rigidbodies[i] = advance(self.rigidbodies[i], self.dt)
+            self.rigidbodies[i] = advance(self.rigidbodies[i], self.dt[None])
 
     @ti.kernel
     def debug(self):

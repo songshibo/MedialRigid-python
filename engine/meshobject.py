@@ -3,12 +3,12 @@ from util import *
 from os.path import exists
 
 
-def compute_mass_center(v):
+def compute_mass_center(v, f):
     return np.mean(v, axis=0)
 
 
 # Refer to http://number-none.com/blow/inertia/index.html
-def compute_inertia_const_density(v, f, center):
+def compute_inertia_const_density(v, f, center, scale):
     C_canonical = np.array([[1.0 / 60.0, 1.0 / 120.0, 1.0 / 120.0],
                             [1.0 / 120.0, 1.0 / 60.0, 1.0 / 120.0],
                             [1.0 / 120.0, 1.0 / 120.0, 1.0 / 60.0]])
@@ -16,9 +16,9 @@ def compute_inertia_const_density(v, f, center):
     C_sum = np.zeros([3, 3])
     for tri in f:
         # compute Covariance of each tetrahedron
-        v1 = v[tri[0], :]
-        v2 = v[tri[1], :]
-        v3 = v[tri[2], :]
+        v1 = v[tri[0], :] * scale[0]
+        v2 = v[tri[1], :] * scale[1]
+        v3 = v[tri[2], :] * scale[2]
         A = np.zeros([3, 3])
         A[:, 0] = v1 - center
         A[:, 1] = v2 - center
@@ -36,15 +36,15 @@ class MeshObject:
         self.mesh = polyscope.register_surface_mesh(self.name, v, f)
         self.position = position
         self.orientation = euler_to_quaternion(rotation)
-        print(self.orientation)
         self.scale = self.mesh.get_transform().diagonal()[:3]
         self.TRS = identity()
         self.compute_transform()
         self.mesh.set_transform(self.TRS)
 
         self.mass_center = compute_mass_center(v)
-        self.inertia = compute_inertia_const_density(v, f, self.mass_center)
-
+        self.inertia = compute_inertia_const_density(
+            v, f, self.mass_center, self.scale)
+        print(self.inertia)
         # Medial Axis Transform info
         self.ma_verts = None
         self.ma_edges = None

@@ -8,7 +8,6 @@ import taichi as ti
 
 ti.init(arch=ti.gpu, debug=True)
 
-dt = 0.01
 objects = []  # all active objects in scenes
 selected = -1
 
@@ -46,7 +45,7 @@ for obj_name in scene_config.sections():
     obj.load_ma(scene_config.get(obj_name, "ma_path", fallback=""))
     objects.append(obj)
 
-sim = Simulator(dt, objects)
+sim = Simulator(0.01, objects)
 
 
 def callback():
@@ -58,6 +57,9 @@ def callback():
         result = sim.rigidbodies.to_numpy()
         for obj in objects:
             obj.update_transform(result)
+
+    _, sim.dt[None] = psimgui.InputFloat(
+        "dt", sim.dt[None], format='%.5f')
 
     psimgui.PopItemWidth()
 
