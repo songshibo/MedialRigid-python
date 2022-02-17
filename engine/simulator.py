@@ -2,7 +2,7 @@ import taichi as ti
 import taichi_glsl as ts
 import numpy as np
 
-from engine.physcis import quaternion_to_mat3
+from engine.physcis import advance, quaternion_multiply, quaternion_to_mat3
 
 vec3 = ti.types.vector(3, ti.f32)
 vec4 = ti.types.vector(4, ti.f32)
@@ -47,7 +47,7 @@ class Simulator:
             v.append(np.array([0, 0, 0]))
             omega.append(np.array([0, 0, 0]))
             F.append(np.array([0, 0, 0]))
-            T.append(np.array([0, 0, 0]))
+            T.append(np.array([100, 0, 0]))
         # here dtype is neccessary on Metal, Metal is only-support 32-bit data
         return {
             "pos": np.array(pos, dtype=np.float32),
@@ -64,23 +64,8 @@ class Simulator:
 
     @ti.kernel
     def update(self):
-        dt = self.dt
-        g = ti.Vector([0, -9.8, 0])
         for i in range(self.n):
-            rb = self.rigidbodies[i]
-
-            rb.linear_m += rb.F * dt + g * rb.mass * dt
-            rb.angular_m += rb.T * dt
-
-            # linear velocity
-            rb.v = rb.linear_m / rb.mass
-            # angular velocity
-            R = quaternion_to_mat3(ts.normalize(rb.rot))
-            print(rb.rot)
-            print(R)
-            rb.pos += rb.v * dt
-
-            self.rigidbodies[i] = rb
+            self.rigidbodies[i] = advance(self.rigidbodies[i], self.dt)
 
     @ti.kernel
     def debug(self):

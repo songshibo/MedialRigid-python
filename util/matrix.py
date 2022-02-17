@@ -14,7 +14,9 @@ def affine(lin, pos):
 
 
 def euler_to_quaternion(rotation):
-    return quaternion_from_euler(axes='rxyz', *np.radians(rotation))
+    q = quaternion_from_euler(axes='rxyz', *np.radians(rotation))
+    q[1:4], q[0] = q[:3], q[3]
+    return q
 
 
 def translate(pos):
@@ -35,6 +37,9 @@ def scale(factor):
 
 def TRS(_position, _orientation, _scale):
     T = translate(_position)
+    # Quaternions w+ix+jy+kz are represented as [w,x,y,z] in transformations
+    # while we use [x,y,z,w], so here we need a simple swap to make sure orientation is in [w,x,y,z]
+    _orientation[1:4], _orientation[0] = _orientation[:3], _orientation[3]
     R = quaternion_matrix(_orientation)
     S = scale(_scale)
     return concatenate_matrices(T, R, S)
