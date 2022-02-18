@@ -3,6 +3,7 @@ import taichi_glsl as ts
 import numpy as np
 
 from engine.physcis import advance
+from util.matrix import scale
 
 vec3 = ti.types.vector(3, ti.f32)
 vec4 = ti.types.vector(4, ti.f32)
@@ -21,6 +22,7 @@ class Simulator:
         self.rigidbodies = ti.Struct.field({
             "pos": vec3,
             "rot": vec4,
+            "scale": vec3,
             "mass": ti.f32,
             "inv_I": mat3,
             "linear_m": vec3,
@@ -36,11 +38,12 @@ class Simulator:
         del rigidbodies_dict
 
     def prepare_data(self, objects):
-        pos, rot, m, inv_I, linear_m, angular_m, v, omega, F, T = [
-        ], [], [], [], [], [], [], [], [], []
+        pos, rot, scale, m, inv_I, linear_m, angular_m, v, omega, F, T = [
+        ], [], [], [], [], [], [], [], [], [], []
         for obj in objects:
             pos.append(obj.position)
             rot.append(obj.orientation)
+            scale.append(obj.scale)
             m.append(1.0)
             inv_I.append(np.linalg.inv(obj.inertia))
             linear_m.append(np.array([0, 0, 0]))
@@ -48,11 +51,12 @@ class Simulator:
             v.append(np.array([0, 0, 0]))
             omega.append(np.array([0, 0, 0]))
             F.append(np.array([0, 0, 0]))
-            T.append(np.array([1, 0, 0]))
+            T.append(np.array([0, 0, 0]))
         # here dtype is neccessary on Metal, Metal is only-support 32-bit data
         return {
             "pos": np.array(pos, dtype=np.float32),
             "rot": np.array(rot, dtype=np.float32),
+            "scale": np.array(scale, dtype=np.float32),
             "mass": np.array(m, dtype=np.float32),
             "inv_I": np.array(inv_I, dtype=np.float32),
             "linear_m": np.array(linear_m, dtype=np.float32),
@@ -65,11 +69,10 @@ class Simulator:
 
     @ti.kernel
     def update(self):
-        print(self.dt[None])
         for i in range(self.n):
             self.rigidbodies[i] = advance(self.rigidbodies[i], self.dt[None])
 
-    @ti.kernel
+    @ ti.kernel
     def debug(self):
         for i in range(self.n):
             print(self.rigidbodies[i].pos)

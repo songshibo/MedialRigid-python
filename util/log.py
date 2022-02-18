@@ -1,30 +1,38 @@
 import spdlog as spd
 
-console_logger = spd.ConsoleLogger('Medial-Rigid')
-console_logger.set_level(spd.LogLevel.TRACE)
-console_logger.set_pattern("[%n]%^[%l]%$ %v")
+
+class Logger:
+    _logger = None
+
+    def __new__(cls, *args, **kwargs):
+        if cls._logger is None:
+            cls._logger = spd.ConsoleLogger('Medial Rigid')
+            cls._logger.set_level(spd.LogLevel.TRACE)
+            cls._logger.set_pattern("[%n]%^[%l]%$ %v")
+
+        return cls._logger
 
 
 def info(info):
-    global console_logger
-    console_logger.info(info)
+    logger = Logger()
+    logger.info(info)
 
 
 def debug(info):
-    global console_logger
-    console_logger.debug(info)
+    logger = Logger()
+    logger.debug(info)
 
 
 def warn(info):
-    global console_logger
-    console_logger.warn(info)
+    logger = Logger()
+    logger.warn(info)
 
 
 def error(info):
-    global console_logger
-    console_logger.error(info)
+    logger = Logger()
+    logger.error(info)
 
 
 def critical(info):
-    global console_logger
-    console_logger.critical(info)
+    logger = Logger()
+    logger.critical(info)

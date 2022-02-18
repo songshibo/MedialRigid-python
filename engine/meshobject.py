@@ -1,38 +1,16 @@
 import igl
+import os
 from util import *
-from os.path import exists
-
-
-def compute_mass_center(v):
-    return np.mean(v, axis=0)
-
-
-# Refer to http://number-none.com/blow/inertia/index.html
-def compute_inertia_const_density(v, f, center, scale):
-    C_canonical = np.array([[1.0 / 60.0, 1.0 / 120.0, 1.0 / 120.0],
-                            [1.0 / 120.0, 1.0 / 60.0, 1.0 / 120.0],
-                            [1.0 / 120.0, 1.0 / 120.0, 1.0 / 60.0]])
-
-    C_sum = np.zeros([3, 3])
-    for tri in f:
-        # compute Covariance of each tetrahedron
-        v1 = v[tri[0], :]
-        v2 = v[tri[1], :]
-        v3 = v[tri[2], :]
-        A = np.zeros([3, 3])
-        A[:, 0] = v1 - center
-        A[:, 1] = v2 - center
-        A[:, 2] = v3 - center
-        C = np.linalg.det(A) * A.dot(C_canonical).dot(A.T)
-        C_sum = C_sum + C
-    return np.trace(C_sum) * np.eye(3) - C_sum
+from .mass_property import *
 
 
 class MeshObject:
     def __init__(self, name: str, path: str, position, rotation, index, polyscope):
         self.name = name
         self.index = index
+        VT, TT = igl.read_msh(tetrahedralize_from_file_with_output(path))
         v, f = igl.read_triangle_mesh(path)
+        # self.mesh = polyscope.register_volume_mesh(self.name, VT, tets=TT)
         self.mesh = polyscope.register_surface_mesh(self.name, v, f)
         self.position = position
         self.orientation = euler_to_quaternion(rotation)
@@ -41,20 +19,53 @@ class MeshObject:
         self.compute_transform()
         self.mesh.set_transform(self.TRS)
 
-        self.mass_center = compute_mass_center(v)
-        self.inertia = compute_inertia_const_density(
-            v, f, self.mass_center, self.scale)
-        print(self.inertia)
+        # mass properties
+        self.mass_center = None
+        self.inertia = None
+        self.compute_mass_properties(VT, TT)
         # Medial Axis Transform info
         self.ma_verts = None
         self.ma_edges = None
         self.ma_faces = None
+        self.load_ma(path)
+
+    def normalize_model(self, path):
+        if np.isclose(np.max(self.scale), 1.0):
+            print("{} is already normalized".format(self.name))
+            return
+        verts, faces = igl.read_triangle_mesh(path)
+        for idx, _ in enumerate(verts):
+            verts[idx] *= self.scale
+        self.mesh.update_vertex_positions(verts)
+        # reset scale
+        self.scale = np.ones(3)
+        self.compute_transform()
+        self.mesh.set_transform(self.TRS)
+        print("Save normalized model(overwrite)")
+        igl.write_triangle_mesh(path, verts, faces)
+
+    def re_tetrahedralize(self, path):
+        tetrahedralize_from_file_with_output(path, True)
+        print("{} is re-tetrahedralized".format(self.name))
+
+    def compute_mass_properties(self, VT, TT):
+        vol = igl.volume(VT, TT)
+        total_V = np.sum(np.absolute(vol))
+        print("[{}]\n   original total volume: {}".format(self.name, total_V))
+
+        self.mass_center = compute_mass_center_with_tet(VT, TT, vol, total_V)
+        print("   mass center: {}".format(self.mass_center))
+
+        self.inertia = compute_inertia_tensor_with_tet(
+            VT, TT, self.mass_center)
 
     def load_ma(self, filepath):
-        if not exists(filepath):
-            print("Object {} has no related ma file.".format(self.name))
+        pre, _ = os.path.splitext(filepath)
+        ma_path = pre + ".ma"
+        if not os.path.exists(ma_path):
+            print("   [No related ma file founded]".format(self.name))
             return
-        file = open(filepath, 'r')
+        file = open(ma_path, 'r')
         first_line = file.readline().rstrip()
         vcount, ecount, fcount = [int(x) for x in first_line.split()]
         assert vcount != 0, "No Medial Vertices!"
