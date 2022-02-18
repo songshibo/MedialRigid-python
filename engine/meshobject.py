@@ -4,22 +4,36 @@ from util import *
 from .mass_property import *
 
 
+def compute_bouding_box(v, _scale):
+    verts = v
+    for vv in verts:
+        vv *= _scale
+    min_corner = np.min(verts, axis=0)
+    max_corner = np.max(verts, axis=0)
+    return np.array([min_corner, max_corner])
+
+
 class MeshObject:
-    def __init__(self, name: str, path: str, position, rotation, index, polyscope):
+    def __init__(self, name: str, path: str, position, rotation, scale, index, mass, polyscope):
         self.name = name
         self.index = index
+        self.position = position
+        self.orientation = euler_to_quaternion(rotation)
+        self.scale = scale
+        self.TRS = identity()
+        self.compute_transform()
+
         VT, TT = igl.read_msh(tetrahedralize_from_file_with_output(path))
         v, f = igl.read_triangle_mesh(path)
         # self.mesh = polyscope.register_volume_mesh(self.name, VT, tets=TT)
         self.mesh = polyscope.register_surface_mesh(self.name, v, f)
-        self.position = position
-        self.orientation = euler_to_quaternion(rotation)
-        self.scale = self.mesh.get_transform().diagonal()[:3]
-        self.TRS = identity()
-        self.compute_transform()
         self.mesh.set_transform(self.TRS)
+        self.bbox = compute_bouding_box(v, self.scale)
+        print("   local AABB:\n   min: {}\n   max: {}".format(
+            self.bbox[0], self.bbox[1]))
 
         # mass properties
+        self.mass = mass
         self.mass_center = None
         self.inertia = None
         self.compute_mass_properties(VT, TT)
@@ -53,11 +67,16 @@ class MeshObject:
         total_V = np.sum(np.absolute(vol))
         print("[{}]\n   original total volume: {}".format(self.name, total_V))
 
+        if self.mass < 0.0:
+            density = 1.0
+            self.mass = total_V
+        else:
+            density = self.mass / total_V
         self.mass_center = compute_mass_center_with_tet(VT, TT, vol, total_V)
         print("   mass center: {}".format(self.mass_center))
 
         self.inertia = compute_inertia_tensor_with_tet(
-            VT, TT, self.mass_center)
+            VT, TT, self.mass_center, density)
 
     def load_ma(self, filepath):
         pre, _ = os.path.splitext(filepath)

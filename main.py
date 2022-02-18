@@ -43,7 +43,10 @@ for obj_name in scene_config.sections():
     path = scene_config[obj_name]['path']
     position = read_np_array(scene_config[obj_name]['position'], np.float32)
     rotation = read_np_array(scene_config[obj_name]['rotation'], np.float32)
-    obj = MeshObject(obj_name, path, position, rotation, len(objects), ps)
+    scale = read_np_array(scene_config[obj_name]['scale'], np.float32)
+    mass = scene_config.getfloat(obj_name, 'mass', fallback=-1.0)
+    obj = MeshObject(obj_name, path, position,
+                     rotation, scale, len(objects), mass, ps)
     objects.append(obj)
 
 print("\nInitialize simulator backends...")
@@ -84,6 +87,8 @@ def callback():
         psimgui.PopItemWidth()
         # other info
         psimgui.PushItemWidth(150)
+        psimgui.InputFloat("Mass", objects[selected].mass)
+        psimgui.SameLine()
         if psimgui.Button("Inertia"):
             print("Interia Tensor: \n{}".format(objects[selected].inertia))
         if psimgui.Button("Normalize & Save"):

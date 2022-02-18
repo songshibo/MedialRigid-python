@@ -3,7 +3,6 @@ import taichi_glsl as ts
 import numpy as np
 
 from engine.physcis import advance
-from util.matrix import scale
 
 vec3 = ti.types.vector(3, ti.f32)
 vec4 = ti.types.vector(4, ti.f32)
@@ -44,14 +43,14 @@ class Simulator:
             pos.append(obj.position)
             rot.append(obj.orientation)
             scale.append(obj.scale)
-            m.append(1.0)
+            m.append(obj.mass)
             inv_I.append(np.linalg.inv(obj.inertia))
             linear_m.append(np.array([0, 0, 0]))
             angular_m.append(np.array([0, 0, 0]))
             v.append(np.array([0, 0, 0]))
             omega.append(np.array([0, 0, 0]))
             F.append(np.array([0, 0, 0]))
-            T.append(np.array([0, 0, 0]))
+            T.append(np.array([2, 0, 0]))
         # here dtype is neccessary on Metal, Metal is only-support 32-bit data
         return {
             "pos": np.array(pos, dtype=np.float32),

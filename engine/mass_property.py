@@ -57,16 +57,16 @@ def affine_inertia(v1, v2, v3):
 
 
 # Refer to http://number-none.com/blow/inertia/index.html
-def compute_inertia_tensor_with_tet(VT, TT, com):
+def compute_inertia_tensor_with_tet(VT, TT, com, density):
     C_sum = np.zeros([3, 3])
     for tet in TT:
         v0 = VT[tet[0], :] - com
         v1 = VT[tet[1], :] - com
         v2 = VT[tet[2], :] - com
         v3 = VT[tet[3], :] - com
-        C_sum = C_sum + affine_inertia(v1, v2, v3)
-        C_sum = C_sum + affine_inertia(v1, v0, v2)
-        C_sum = C_sum + affine_inertia(v1, v3, v0)
-        C_sum = C_sum + affine_inertia(v0, v3, v2)
+        C_sum = C_sum + affine_inertia(v1, v2, v3) * density
+        C_sum = C_sum + affine_inertia(v1, v0, v2) * density
+        C_sum = C_sum + affine_inertia(v1, v3, v0) * density
+        C_sum = C_sum + affine_inertia(v0, v3, v2) * density
 
     return np.trace(C_sum) * np.eye(3) - C_sum
