@@ -4,6 +4,20 @@ import taichi_glsl as ts
 
 g = ti.Vector([0, -9.8, 0])
 
+ti.init(arch=ti.gpu)
+
+
+@ti.kernel
+def foo():
+    num = 0
+    for i, j, k, m in ti.ndrange((2, 4), (0, 2), (1, 4), (2, 5)):
+        print("{},{},{},{}".format(i, j, k, m))
+        num += 1
+    print(num)
+
+
+foo()
+
 
 @ti.func
 def quaternion_multiply(a, b):
