@@ -48,11 +48,11 @@ def test2(x_l: ti.int32, x_h: ti.int32, y_l: ti.int32, y_h: ti.int32):
     print(valid_num)
 
 
-test1()
+# test1()
 # test2(0, 1000, 1000, 4500)
 # test2(1000, 3000, 3000, 4500)
-# for i in range(2):
-#     for j in range(i+1, 3):
-#         test2(idx_range[i, 0], idx_range[i, 1],
-#               idx_range[j, 0], idx_range[j, 1])
+for i in range(2):
+    for j in range(i+1, 3):
+        test2(idx_range[i, 0], idx_range[i, 1],
+              idx_range[j, 0], idx_range[j, 1])
 ti.print_kernel_profile_info()

@@ -47,7 +47,7 @@ def compute_mass_center_with_triangle(v, f):
     return tmp_center / total_m
 
 
-def affine_inertia(v1, v2, v3):
+def affine_covariance(v1, v2, v3):
     global C_canonical
     A = np.zeros([3, 3])
     A[:, 0] = v1
@@ -64,9 +64,9 @@ def compute_inertia_tensor_with_tet(VT, TT, com, density):
         v1 = VT[tet[1], :] - com
         v2 = VT[tet[2], :] - com
         v3 = VT[tet[3], :] - com
-        C_sum = C_sum + affine_inertia(v1, v2, v3) * density
-        C_sum = C_sum + affine_inertia(v1, v0, v2) * density
-        C_sum = C_sum + affine_inertia(v1, v3, v0) * density
-        C_sum = C_sum + affine_inertia(v0, v3, v2) * density
+        C_sum = C_sum + affine_covariance(v1, v2, v3) * density
+        C_sum = C_sum + affine_covariance(v1, v0, v2) * density
+        C_sum = C_sum + affine_covariance(v1, v3, v0) * density
+        C_sum = C_sum + affine_covariance(v0, v3, v2) * density
 
     return np.trace(C_sum) * np.eye(3) - C_sum
