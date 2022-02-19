@@ -38,4 +38,4 @@ def test1():
 
 
 test1()
-# ti.print_kernel_profile_info()
+ti.print_kernel_profile_info()
