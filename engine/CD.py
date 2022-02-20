@@ -2,7 +2,7 @@ import taichi as ti
 import numpy as np
 import taichi_glsl as ts
 
-ti.init(arch=ti.gpu, debug=True)
+ti.init(arch=ti.gpu, debug=True, kernel_profiler=True)
 
 
 @ti.func
@@ -167,28 +167,35 @@ def get_sphere_slab_nearest(m: ti.template(), m1: ti.template(), m2: ti.template
     return t1, t2
 
 
+cq = ti.Vector([0.2, 0.5, 0.35, 0.1])
+cone_m1 = ti.Vector([0.0, 0.0, 0.0, 0.1])
+cone_m2 = ti.Vector([1.0, 0.0, 0.0, 0.3])
+cone_m3 = ti.Vector([0.5, 0.0, 1.0, 0.2])
+
+
 @ti.kernel
 def unit_test():
-    cq = ti.Vector([0.2, 0.5, 0.35, 0.1])
-    cone_m1 = ti.Vector([0.0, 0.0, 0.0, 0.1])
-    cone_m2 = ti.Vector([1.0, 0.0, 0.0, 0.3])
-    cone_m3 = ti.Vector([0.5, 0.0, 1.0, 0.2])
     # print(get_sphere_cone_nearest(cq, cone_m1, cone_m2))
     t1, t2 = get_sphere_slab_nearest(cq, cone_m1, cone_m2, cone_m3)
     print("t1:{},t2:{}".format(t1, t2))
     min_dis = surface_distane(cq, bary_lerp(cone_m1, cone_m2, cone_m3, t1, t2))
     print(min_dis)
-    tt1, tt2 = 0.0, 0.0
-    total_num = 0
-    for i, j in ti.ndrange(5000, 5000):
-        tt1 += i * 1.0 / 5000
-        tt2 += j * 1.0 / 5000
-        dis = surface_distane(cq, bary_lerp(
-            cone_m1, cone_m2, cone_m3, tt1, tt2))
-        if dis > min_dis:
-            # print("{},{}".format(tt1, tt2))
-            ti.atomic_add(total_num, 1)
-    print("failed num:{}".format(total_num))
+    for i, j in ti.ndrange(1000, 1000):
+        t1, t2 = get_sphere_slab_nearest(cq, cone_m1, cone_m2, cone_m3)
+        min_dis = surface_distane(cq, bary_lerp(
+            cone_m1, cone_m2, cone_m3, t1, t2))
+    # tt1, tt2 = 0.0, 0.0
+    # total_num = 0
+    # for i, j in ti.ndrange(1000, 1000):
+    #     tt1 += i * 1.0 / 1000
+    #     tt2 += j * 1.0 / 1000
+    #     dis = surface_distane(cq, bary_lerp(
+    #         cone_m1, cone_m2, cone_m3, tt1, tt2))
+    #     if dis > min_dis:
+    #         # print("{},{}".format(tt1, tt2))
+    #         ti.atomic_add(total_num, 1)
+    # print("failed num:{}".format(total_num))
 
 
 unit_test()
+ti.print_kernel_profile_info('trace')
