@@ -35,7 +35,6 @@ def test1():
             in_ignore_area = in_ignore_area or in_area
         if not in_ignore_area:
             ti.atomic_add(valid_num, 1)
-            # break
     print(valid_num)
 
 
