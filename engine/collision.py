@@ -173,32 +173,33 @@ cone_m2 = ti.Vector([1.0, 0.0, 0.0, 0.3])
 cone_m3 = ti.Vector([0.5, 0.0, 1.0, 0.2])
 
 s = ti.field(ti.f32, shape=())
+s[None] = 0
 
 
 @ti.kernel
 def unit_test():
     # print(get_sphere_cone_nearest(cq, cone_m1, cone_m2))
-    t1, t2 = get_sphere_slab_nearest(cq, cone_m1, cone_m2, cone_m3)
-    print("t1:{},t2:{}".format(t1, t2))
-    min_dis = surface_distane(cq, bary_lerp(cone_m1, cone_m2, cone_m3, t1, t2))
-    print(min_dis)
-    # for i, j in ti.ndrange(1000, 1000):
-    #     t1, t2 = get_sphere_slab_nearest(cq, cone_m1, cone_m2, cone_m3)
-    #     min_dis = surface_distane(cq, bary_lerp(
-    #         cone_m1, cone_m2, cone_m3, t1, t2))
-    tt1, tt2 = 0.0, 0.0
-    total_num = 0
+    # t1, t2 = get_sphere_slab_nearest(cq, cone_m1, cone_m2, cone_m3)
+    # print("t1:{},t2:{}".format(t1, t2))
+    # min_dis = surface_distane(cq, bary_lerp(cone_m1, cone_m2, cone_m3, t1, t2))
+    # print(min_dis)
     for i, j in ti.ndrange(1000, 1000):
-        tt1 += i * 1.0 / 1000
-        tt2 += j * 1.0 / 1000
-        dis = surface_distane(cq, bary_lerp(
-            cone_m1, cone_m2, cone_m3, tt1, tt2))
-        if dis > min_dis:
-            # print("{},{}".format(tt1, tt2))
-            tt1 += 0.0
-        # ti.atomic_add(total_num, 1)
-    print("failed num:{}".format(total_num))
+        t1, t2 = get_sphere_slab_nearest(cq, cone_m1, cone_m2, cone_m3)
+        min_dis = surface_distane(cq, bary_lerp(
+            cone_m1, cone_m2, cone_m3, t1, t2))
+        s[None] = ti.atomic_min(s[None], min_dis)
+    print(s[None])
+    # tt1, tt2 = 0.0, 0.0
+    # for i, j in ti.ndrange(1000, 1000):
+    #     tt1 += i * 1.0 / 1000
+    #     tt2 += j * 1.0 / 1000
+    #     dis = surface_distane(cq, bary_lerp(
+    #         cone_m1, cone_m2, cone_m3, tt1, tt2))
+    #     if dis > min_dis:
+    #         # print("{},{}".format(tt1, tt2))
+    #         ti.atomic_add(s[None], 1.0)
+    # print("failed num:{}".format(s[None]))
 
 
 unit_test()
-ti.print_kernel_profile_info('trace')
+ti.print_kernel_profile_info()
