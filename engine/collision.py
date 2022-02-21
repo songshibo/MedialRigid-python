@@ -22,6 +22,42 @@ def surface_distane(m1: ti.template(), m2: ti.template()) -> ti.f32:
     return ts.length(c1-c2) - (m1.w + m2.w)
 
 
+# Check point is inside triangle
+# this function does not check if P is coplanar with ABC
+@ti.func
+def is_point_inside_triangle(P, A, B, C):
+    ab, ac, ap, pc, pb = B-A, C-A, P-A, C-P, B-P
+    abc = ts.length(ts.cross(ab, ac))
+    abp = ts.length(ts.cross(ab, ap))
+    bcp = ts.length(ts.cross(pc, pb))
+    cap = ts.length(ts.cross(ac, pc))
+
+    t1, t2, t3 = bcp / abc, cap / abc, abp / abc
+    print("t1:{},t2:{},t3:{}".format(t1, t2, t3))
+    return t1+t2+t3 == 1.0, t1, t2
+
+
+# Check intersection of line segment and triangle
+# segment: {e1,e2}, triangle: {A,B,C}
+@ti.func
+def is_segement_intersect_with_triangle(e1, e2, A, B, C):
+    t1, t2, t3 = 0.0, 0.0, 0.0
+    seg = e1-e2
+    norm = ts.cross(A-C, B-C)
+    v = ts.dot(seg, norm)
+    intersected = (v != 0.0)  # check parallel
+    if intersected:
+        e2A = A - e2
+        t1 = ts.dot(e2A, norm) / v  # linear interpolation parameter
+        if (t1 < 0.0) or (t1 > 1.0):  # check if point is on segment
+            intersected = False
+        else:
+            point = e2 + t1 * seg
+            intersected, t2, t3 = is_point_inside_triangle(point, A, B, C)
+
+    return intersected, t1, t2, t3
+
+
 @ti.func
 def get_sphere_cone_nearest(m: ti.template(),  m1: ti.template(), m2: ti.template()):
     cm = ti.Vector([m.x, m.y, m.z])
@@ -167,10 +203,207 @@ def get_sphere_slab_nearest(m: ti.template(), m1: ti.template(), m2: ti.template
     return t1, t2
 
 
-cq = ti.Vector([0.2, 0.5, 0.35, 0.1])
-cone_m1 = ti.Vector([0.0, 0.0, 0.0, 0.1])
+@ti.func
+def get_cone_cone_nearest(m11: ti.template(), m12: ti.template(), m21: ti.template(), m22: ti.template()):
+    c11 = ti.Vector([m11.x, m11.y, m11.z])
+    c12 = ti.Vector([m12.x, m12.y, m12.z])
+    c21 = ti.Vector([m21.x, m21.y, m21.z])
+    c22 = ti.Vector([m22.x, m22.y, m22.z])
+    r11, r12, r21, r22 = ti.static(m11.w, m12.w, m21.w, m22.w)
+
+    inversed1, inversed2 = False, False
+    if r11 > r12:
+        c11, c12 = c12, c11
+        r11, r12 = r12, r11
+        inversed1 = True
+    if r21 > r22:
+        c21, c22 = c22, c21
+        r21, r22 = r22, r21
+        inversed2 = True
+
+    c12c11 = c11-c12
+    c22c21 = c21-c22
+    c22c12 = c12-c22
+
+    # S(x,y) = S_c(x,y)^(1/2) - S_r(x,y)
+    # = [Ax^2+Bxy+Cy^2+Dx+Ey+F]^(1/2) - (R1x+R2y+R3)
+    R1 = r11 - r12
+    R2 = r21 - r22
+    A = ts.dot(c12c11, c12c11)
+    B = -2.0 * ts.dot(c12c11, c22c21)
+    C = ts.dot(c22c21, c22c21)
+    D = 2.0 * ts.dot(c12c11, c22c12)
+    E = -2.0 * ts.dot(c22c21, c22c12)
+    F = ts.dot(c22c12, c22c12)
+
+    t1, t2 = 0.0, 0.0
+    # cone:{m11,m12} parallel to cone:{m21,m22}
+    if (4.0 * A * C - B * B) == 0.0:
+        # find minimum distance
+        # m11 to cone:{m21,m22}
+        t = get_sphere_cone_nearest(m11, m21, m22)
+        min_dis = surface_distane(m11, linear_lerp(m21, m22, t))
+        t1, t2 = 1.0, t
+        # m12 to cone:{m21,m22}
+        t = get_sphere_cone_nearest(m12, m21, m22)
+        dis = surface_distane(m12, linear_lerp(m21, m22, t))
+        if dis < min_dis:
+            t1, t2 = 0.0, t
+            min_dis = dis
+        # m21 to cone:{m11,m12}
+        t = get_sphere_cone_nearest(m21, m11, m12)
+        dis = surface_distane(m21, linear_lerp(m11, m12, t))
+        if dis < min_dis:
+            t1, t2 = t, 1.0
+            min_dis = dis
+        # m22 to cone:{m11,m12}
+        t = get_sphere_cone_nearest(m22, m11, m12)
+        dis = surface_distane(m22, linear_lerp(m11, m12, t))
+        if dis < min_dis:
+            t1, t2 = t, 0.0
+    else:
+        if R1 != 0.0 and R2 != 0.0:
+            L1 = 2.0 * A * R2 - B * R1
+            L2 = 2.0 * C * R1 - B * R2
+            L3 = E * R1 - D * R2
+            # L1=0,L2=0 has already been considered
+            if L1 == 0.0 and L2 != 0.0:
+                t2 = -1.0 * L3 / L2
+                W1 = 4.0 * A * A - 4.0 * R1 * R1 * A
+                W2 = 4.0 * A * (B * t2 + D) - 4.0 * R1 * R1 * (B * t2 + D)
+                W3 = (B * t2 + D) * (B * t2 + D) - 4.0 * \
+                    R1 * R1 * (C * t2 * t2 + E * t2 + F)
+                if W1 == 0.0:
+                    t1 = -W3 / W2
+                else:
+                    delta = ti.max(W2 * W2 - 4.0 * W1 * W3, 0.0)
+                    t1 = (-W2 - ti.sqrt(delta)) / (2.0 * W1)
+            elif L1 != 0.0 and L2 == 0.0:
+                t1 = L3 / L1
+                W1 = 4.0 * C * C - 4.0 * R2 * R2 * C
+                W2 = 4.0 * C * (B * t1 + E) - 4.0 * R2 * R2 * (B * t1 + E)
+                W3 = (B * t1 + E) * (B * t1 + E) - 4.0 * \
+                    R2 * R2 * (A * t1 * t1 + D * t1 + F)
+                if W1 == 0.0:
+                    t2 = -W3 / W2
+                else:
+                    delta = ti.max(W2 * W2 - 4.0 * W1 * W3, 0.0)
+                    t2 = (-W2 - ti.sqrt(delta)) / (2.0 * W1)
+            else:  # L1,L2 != 0
+                H3 = L2 / L1
+                K3 = L3 / L1
+                W1 = pow(2.0 * C + B * H3, 2) - 4.0 * R2 * \
+                    R2 * (A * H3 * H3 + B * H3 + C)
+                W2 = 2.0 * (2.0 * C + B * H3) * (B * K3 + E) - 4.0 * \
+                    R2 * R2 * (2.0 * A * H3 * K3 + B * K3 + D * H3 + E)
+                W3 = pow(B * K3 + E, 2) - 4.0 * R2 * \
+                    R2 * (A * K3 * K3 + D * K3 + F)
+                delta = ti.max(W2 * W2 - 4.0 * W1 * W3, 0.0)
+                t2 = (-W2 - ti.sqrt(delta)) / (2.0 * W1)
+                t1 = H3 * t2 + K3
+        elif R1 == 0.0 and R2 == 0.0:
+            denom = 4.0 * A * C - B * B
+            t1 = (B * E - 2.0 * C * D) / denom
+            t2 = (B * E - 2.0 * A * E) / denom
+        elif R1 == 0.0 and R2 != 0.0:
+            H1 = -B / (2.0 * A)
+            K1 = -D / (2.0 * A)
+            W1 = pow(2.0 * C + B * H1, 2) - 4.0 * R2 * \
+                R2 * (A * H1 * H1 + B * H1 + C)
+            W2 = 2.0 * (2.0 * C + B * H1) * (B * K1 + E) - 4.0 * R2 * \
+                R2 * (2.0 * A * H1 * K1 + B * K1 + D * H1 + E)
+            W3 = pow(B * K1 + E, 2) - 4.0 * R2 * \
+                R2 * (A * K1 * K1 + D * K1 + F)
+            delta = ti.max(W2 * W2 - 4.0 * W1 * W3, 0.0)
+            t2 = (-W2 - ti.sqrt(delta)) / (2.0 * W1)
+            t1 = H1 * t2 + K1
+        else:  # R1 != 0 and R2 == 0
+            H2 = -B / (2.0 * C)
+            K2 = -E / (2.0 * C)
+            W1 = pow(2.0 * A + B * H2, 2) - 4.0 * R1 * \
+                R1 * (A + B * H2 + C * H2 * H2)
+            W2 = 2.0 * (2.0 * A + B * H2) * (B * K2 + D) - 4.0 * R1 * \
+                R1 * (B * K2 + 2.0 * C * H2 * K2 + D + E * H2)
+            W3 = pow(B * K2 + D, 2) - 4.0 * R1 * \
+                R1 * (C * K2 * K2 + E * K2 + F)
+            delta = ti.max(W2 * W2 - 4.0 * W1 * W3, 0.0)
+            t1 = (-W2 - ti.sqrt(delta)) / (2.0 * W1)
+            t2 = H2 * t1 + K2
+
+        # post-processing t1,t2
+        if inversed1:
+            t1 = 1.0-t1
+        if inversed2:
+            t2 = 1.0-t2
+        if 0.0 <= t1 <= 1.0 and 0.0 <= t2 <= 1.0:
+            pass
+        else:
+            t1, t2 = ts.clamp(t1, 0.0, 1.0), ts.clamp(t2, 0.0, 1.0)
+            l_m1 = linear_lerp(m11, m12, t1)
+            l_m2 = linear_lerp(m21, m22, t2)
+            # find minimum distance
+            t21 = get_sphere_cone_nearest(l_m1, m21, m22)
+            d1 = surface_distane(l_m1, linear_lerp(m21, m22, t21))
+            t11 = get_sphere_cone_nearest(l_m2, m11, m12)
+            d2 = surface_distane(l_m2, linear_lerp(m11, m12, t11))
+            if d1 < d2:
+                t2 = t21
+            else:
+                t1 = t11
+
+    return t1, t2
+
+
+@ti.func
+def get_cone_slab_nearest(m11: ti.template(), m12: ti.template(), m21: ti.template(), m22: ti.template(), m23: ti.template()):
+    c11 = ti.Vector([m11.x, m11.y, m11.z])
+    c12 = ti.Vector([m12.x, m12.y, m12.z])
+    c21 = ti.Vector([m21.x, m21.y, m21.z])
+    c22 = ti.Vector([m22.x, m22.y, m22.z])
+    c23 = ti.Vector([m23.x, m23.y, m23.z])
+
+    intersected, t1, t2, t3 = is_segement_intersect_with_triangle(
+        c11, c12, c21, c22, c23)
+    # if not intersected:
+    #     # initial as {m11,m12} to {m21,m22}
+    #     t1, t2 = get_cone_cone_nearest(m11, m12, m21, m22)
+    #     t3 = 0.0
+    #     min_dis = surface_distane(linear_lerp(
+    #         m11, m12, t1), linear_lerp(m21, m22, t2))
+    #     # {m11,m12} to {m22,m23}
+    #     tt1, tt2 = get_cone_cone_nearest(m11, m12, m22, m23)
+    #     dis = surface_distane(linear_lerp(m11, m12, tt1),
+    #                           linear_lerp(m22, m23, tt2))
+    #     if dis < min_dis:
+    #         min_dis = dis
+    #         t1, t2, t3 = tt1, 0.0, tt2
+    #     # {m11,m12} to {m21,m23}
+    #     tt1, tt2 = get_cone_cone_nearest(m11, m12, m21, m23)
+    #     dis = surface_distane(linear_lerp(m11, m12, tt1),
+    #                           linear_lerp(m21, m23, tt2))
+    #     if dis < min_dis:
+    #         min_dis = dis
+    #         t1, t2, t3 = tt1, tt2, 1-tt1-tt2
+    #     # m11 to {m21,m22,m23}
+    #     tt1, tt2 = get_sphere_slab_nearest(m11, m21, m22, m23)
+    #     dis = surface_distane(m11, bary_lerp(m21, m22, m23, tt1, tt2))
+    #     if dis < min_dis:
+    #         min_dis = dis
+    #         t1, t2, t3 = 1.0, tt1, tt2
+    #     # m12 to {m21,m22,m23}
+    #     tt1, tt2 = get_sphere_slab_nearest(m12, m21, m22, m23)
+    #     dis = surface_distane(m12, bary_lerp(m21, m22, m23, tt1, tt2))
+    #     if dis < min_dis:
+    #         t1, t2, t3 = 0.0, tt1, tt2
+
+    return t1, t2, t3
+
+
+cq = ti.Vector([0.0, 0.5, 0, 0.1])
+cone_m1 = ti.Vector([0.0, 0.5, 1.63, 0.1])
 cone_m2 = ti.Vector([1.0, 0.0, 0.0, 0.3])
 cone_m3 = ti.Vector([0.5, 0.0, 1.0, 0.2])
+cone_m4 = ti.Vector([0.0, 0.0, 0.0, 0.15])
 
 s = ti.field(ti.f32, shape=())
 s[None] = 0
@@ -178,28 +411,24 @@ s[None] = 0
 
 @ti.kernel
 def unit_test():
+    # t1, t2 = get_cone_cone_nearest(cq, cone_m1, cone_m2, cone_m3)
     # print(get_sphere_cone_nearest(cq, cone_m1, cone_m2))
     # t1, t2 = get_sphere_slab_nearest(cq, cone_m1, cone_m2, cone_m3)
-    # print("t1:{},t2:{}".format(t1, t2))
-    # min_dis = surface_distane(cq, bary_lerp(cone_m1, cone_m2, cone_m3, t1, t2))
-    # print(min_dis)
-    for i, j in ti.ndrange(1000, 1000):
-        t1, t2 = get_sphere_slab_nearest(cq, cone_m1, cone_m2, cone_m3)
-        min_dis = surface_distane(cq, bary_lerp(
-            cone_m1, cone_m2, cone_m3, t1, t2))
-        s[None] = ti.atomic_min(s[None], min_dis)
-    print(s[None])
-    # tt1, tt2 = 0.0, 0.0
+    t1, t2, t3 = get_cone_slab_nearest(cq, cone_m1, cone_m2, cone_m3, cone_m4)
+    print("t1:{},t2:{},t3:{}".format(t1, t2, t3))
+    # min_dis = surface_distane(cq, bary_lerp(cone_m1, cone_m2, cone_m3, t1, t2))...............................................................
+    # min_dis = surface_distane(linear_lerp(
+    #     cq, cone_m1, t1), linear_lerp(cone_m2, cone_m3, t2))
+    min_dis = surface_distane(linear_lerp(cq, cone_m1, t1), bary_lerp(
+        cone_m2, cone_m3, cone_m4, t2, t3))
+    print(min_dis)
     # for i, j in ti.ndrange(1000, 1000):
-    #     tt1 += i * 1.0 / 1000
-    #     tt2 += j * 1.0 / 1000
-    #     dis = surface_distane(cq, bary_lerp(
-    #         cone_m1, cone_m2, cone_m3, tt1, tt2))
-    #     if dis > min_dis:
-    #         # print("{},{}".format(tt1, tt2))
-    #         ti.atomic_add(s[None], 1.0)
-    # print("failed num:{}".format(s[None]))
+    #     t1, t2 = get_sphere_slab_nearest(cq, cone_m1, cone_m2, cone_m3)
+    #     min_dis = surface_distane(cq, bary_lerp(
+    #         cone_m1, cone_m2, cone_m3, t1, t2))
+    #     ti.atomic_max(s[None], min_dis)
+    # print(s[None])
 
 
 unit_test()
-ti.print_kernel_profile_info()
+# ti.print_kernel_profile_info()
