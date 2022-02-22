@@ -1,4 +1,3 @@
-from gevent import config
 import polyscope as ps
 import polyscope.imgui as psimgui
 import os

@@ -2,7 +2,7 @@ import taichi as ti
 import numpy as np
 import taichi_glsl as ts
 
-ti.init(arch=ti.gpu, debug=True, kernel_profiler=True)
+# ti.init(arch=ti.gpu, debug=True, kernel_profiler=True)
 
 
 @ti.func
@@ -400,29 +400,94 @@ def get_cone_slab_nearest(m11: ti.template(), m12: ti.template(), m21: ti.templa
     return t1, t2, t3
 
 
-cq = ti.Vector([0.5, 1.0, 0.37, 0.3])
-cone_m1 = ti.Vector([0.5, 1.0, -2.0, 0.1])
-cone_m2 = ti.Vector([1.0, 0.0, 0.0, 0.3])
-cone_m3 = ti.Vector([0.5, 0.0, 1.0, 0.2])
-cone_m4 = ti.Vector([0.0, 0.0, 0.0, 0.15])
+cq = ti.Vector([0.0, 0.5, 0.5, 0.3])
+cone_m1 = ti.Vector([0.5, 0.0, 0.0, 0.35])
+cone_m2 = ti.Vector([-0.5, 0.0, 0.0, 0.5])
+# cone_m3 = ti.Vector([0.5, 0.0, 1.0, 0.2])
+# cone_m4 = ti.Vector([0.0, 0.0, 0.0, 0.15])
 
-s = ti.field(ti.f32, shape=())
-s[None] = 0
+# s = ti.field(ti.f32, shape=())
+# s[None] = 0
+
+
+@ti.data_oriented
+class UnitTest:
+    def __init__(self):
+        self.t11 = ti.field(ti.f32, shape=())
+        self.t12 = ti.field(ti.f32, shape=())
+        self.t21 = ti.field(ti.f32, shape=())
+        self.t22 = ti.field(ti.f32, shape=())
+        self.min_dis = ti.field(ti.f32, shape=())
+
+    @ti.kernel
+    def unit_sphere_cone(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr()):
+        ti_m1 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
+        ti_m2 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
+        ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
+        self.t21[None] = get_sphere_cone_nearest(ti_m1, ti_m2, ti_m3)
+
+    @ti.kernel
+    def unit_cone_cone(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr()):
+        ti_m1 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
+        ti_m2 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
+        ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
+        ti_m4 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
+        self.t11[None], self.t21[None] = get_cone_cone_nearest(
+            ti_m1, ti_m2, ti_m3, ti_m4)
+
+    @ti.kernel
+    def unit_sphere_slab(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr()):
+        ti_m1 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
+        ti_m2 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
+        ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
+        ti_m4 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
+        self.t21[None], self.t22[None] = get_sphere_slab_nearest(
+            ti_m1, ti_m2, ti_m3, ti_m4)
+
+    @ti.kernel
+    def unit_cone_slab(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr(), m5: ti.any_arr()):
+        ti_m1 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
+        ti_m2 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
+        ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
+        ti_m4 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
+        ti_m5 = ti.Vector([m5[0], m5[1], m5[2], m5[3]])
+        self.t11[None], self.t21[None], self.t22[None] = get_cone_slab_nearest(
+            ti_m1, ti_m2, ti_m3, ti_m4, ti_m5)
+
+    @ti.kernel
+    def proof_sphere_slab(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr()):
+        ti_m1 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
+        ti_m2 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
+        ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
+        ti_m4 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
+        self.min_dis[None] = 1000000.0
+        min_t1, min_t2 = -1.0, -1.0
+        for i, j in ti.ndrange(5000, 5000):
+            t1, t2 = i / 5000.0, j / 5000.0
+            if t1 + t2 <= 1.0:
+                m = bary_lerp(ti_m2, ti_m3, ti_m4, t1, t2)
+                dis = surface_distane(ti_m1, m)
+                if dis < self.min_dis[None]:
+                    ti.atomic_min(self.min_dis[None], dis)
+                    min_t1, min_t2 = t1, t2
+        print("{},{}".format(min_t1, min_t2))
 
 
 @ti.kernel
 def unit_test():
+    t = get_sphere_cone_nearest(cq, cone_m1, cone_m2)
+    print(t)
     # t1, t2 = get_cone_cone_nearest(cq, cone_m1, cone_m2, cone_m3)
     # print(get_sphere_cone_nearest(cq, cone_m1, cone_m2))
     # t1, t2 = get_sphere_slab_nearest(cq, cone_m1, cone_m2, cone_m3)
-    t1, t2, t3 = get_cone_slab_nearest(cq, cone_m1, cone_m2, cone_m3, cone_m4)
-    print("t1:{},t2:{},t3:{}".format(t1, t2, t3))
+    # t1, t2, t3 = get_cone_slab_nearest(cq, cone_m1, cone_m2, cone_m3, cone_m4)
+    # print("t1:{},t2:{},t3:{}".format(t1, t2, t3))
     # min_dis = surface_distane(cq, bary_lerp(cone_m1, cone_m2, cone_m3, t1, t2))...............................................................
     # min_dis = surface_distane(linear_lerp(
     #     cq, cone_m1, t1), linear_lerp(cone_m2, cone_m3, t2))
-    min_dis = surface_distane(linear_lerp(cq, cone_m1, t1), bary_lerp(
-        cone_m2, cone_m3, cone_m4, t2, t3))
-    print(min_dis)
+    # min_dis = surface_distane(linear_lerp(cq, cone_m1, t1), bary_lerp(
+    #     cone_m2, cone_m3, cone_m4, t2, t3))
+    # print(min_dis)
     # for i, j in ti.ndrange(1000, 1000):
     #     t1, t2 = get_sphere_slab_nearest(cq, cone_m1, cone_m2, cone_m3)
     #     min_dis = surface_distane(cq, bary_lerp(
@@ -430,6 +495,8 @@ def unit_test():
     #     ti.atomic_max(s[None], min_dis)
     # print(s[None])
 
+    # unit_test()
+    # ti.print_kernel_profile_info()
 
-unit_test()
-# ti.print_kernel_profile_info()
+
+# unit_test()
