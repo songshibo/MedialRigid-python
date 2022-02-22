@@ -144,6 +144,7 @@ def callback():
     psimgui.TextUnformatted("First Primitive")
     changed, m11 = psimgui.InputFloat4("Medial Sphere11", m11)
     if changed:
+        update_curve_network()
         TS(sp11, m11[:3], m11[3])
     if unit_test_selected == "Cone-Cone" or unit_test_selected == "Cone-Slab":
         sp12.set_enabled(True)
