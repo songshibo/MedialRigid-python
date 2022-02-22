@@ -1,3 +1,4 @@
+from matplotlib.pyplot import step
 import taichi as ti
 import numpy as np
 import taichi_glsl as ts
@@ -58,6 +59,12 @@ def is_segement_intersect_with_triangle(e1, e2, A, B, C):
 
 
 @ti.func
+def get_quadratic_function_solution(W1, W2, W3):
+    delta = ti.sqrt(W2 * W2 - 4.0 * W1 * W3)
+    return (-W2 - delta) / (2.0 * W1), (-W2 + delta) / (2.0 * W1)
+
+
+@ti.func
 def get_sphere_cone_nearest(m: ti.template(),  m1: ti.template(), m2: ti.template()):
     cm = ti.Vector([m.x, m.y, m.z])
     c1 = ti.Vector([m1.x, m1.y, m1.z])
@@ -95,22 +102,13 @@ def get_sphere_slab_nearest(m: ti.template(), m1: ti.template(), m2: ti.template
     c2 = ti.Vector([m2.x, m2.y, m2.z])
     c3 = ti.Vector([m3.x, m3.y, m3.z])
     r1, r2, r3 = ti.static(m1.w, m2.w, m3.w)
-    inversed13, inversed23 = False, False
-    if r1 > r3:
-        c1, c3 = c3, c1
-        r1, r3 = r3, r1
-        inversed13 = True
-    if r2 > r3:
-        c2, c3 = c3, c2
-        r2, r3 = r3, r2
-        inversed23 = True
 
     c31 = c1-c3
     c32 = c2-c3
     cm3 = c3-cm
+
     R1 = r1-r3
     R2 = r2-r3
-
     A = ts.dot(c31, c31)
     B = 2.0 * ts.dot(c31, c32)
     C = ts.dot(c32, c32)
@@ -132,8 +130,12 @@ def get_sphere_slab_nearest(m: ti.template(), m1: ti.template(), m2: ti.template
             R1 * (B * K2 + 2.0 * C * H2 * K2 + D + E * H2)
         W3 = pow(B * K2 + D, 2.0) - 4.0 * R1 * \
             R1 * (C * K2 * K2 + E * K2 + F)
-        t1 = (-W2 - ti.sqrt(W2 * W2 - 4.0 * W1 * W3)) / (2.0 * W1)
-        t2 = H2 * t1 + K2
+        t11, t12 = get_quadratic_function_solution(W1, W2, W3)
+        t21, t22 = H2 * t11 + K2, H2 * t12 + K2
+        dis = surface_distane(m, bary_lerp(m1, m2, m3, t11, t21))
+        t1, t2 = t11, t21
+        if surface_distane(m, bary_lerp(m1, m2, m3, t12, t22)) < dis:
+            t1, t2 = t12, t22
     elif R1 == 0.0 and R2 != 0.0:
         H1 = -B / (2.0 * A)
         K1 = -D / (2.0 * A)
@@ -143,8 +145,12 @@ def get_sphere_slab_nearest(m: ti.template(), m1: ti.template(), m2: ti.template
             R2 * (B * K1 + 2.0 * A * H1 * K1 + E + D * H1)
         W3 = pow(B * K1 + E, 2.0) - 4.0 * R2 * \
             R2 * (A * K1 * K1 + D * K1 + F)
-        t2 = (-W2 - ti.sqrt(W2 * W2 - 4.0 * W1 * W3)) / (2.0 * W1)
-        t1 = H1 * t2 + K1
+        t21, t22 = get_quadratic_function_solution(W1, W2, W3)
+        t11, t12 = H1 * t21 + K1, H1 * t22 + K1
+        dis = surface_distane(m, bary_lerp(m1, m2, m3, t11, t21))
+        t1, t2 = t11, t21
+        if surface_distane(m, bary_lerp(m1, m2, m3, t12, t22)) < dis:
+            t1, t2 = t12, t22
     else:
         L1 = 2.0 * A * R2 - B * R1
         L2 = 2.0 * C * R1 - B * R2
@@ -154,34 +160,39 @@ def get_sphere_slab_nearest(m: ti.template(), m1: ti.template(), m2: ti.template
             W1 = 4.0 * A * A - 4.0 * R1 * R1 * A
             W2 = 4.0 * A * (B * t2 + D) - 4.0 * R1 * R1 * (B * t2 + D)
             W3 = pow(B * t2 + D, 2.0) - (C * t2 * t2 + E * t2 + F)
-            t1 = (-W2 - ti.sqrt(W2 * W2 - 4.0 * W1 * W3)) / (2.0 * W1)
+            t11, t12 = get_quadratic_function_solution(W1, W2, W3)
+            dis = surface_distane(m, bary_lerp(m1, m2, m3, t11, t2))
+            t1 = t11
+            if surface_distane(m, bary_lerp(m1, m2, m3, t12, t2)) < dis:
+                t1 = t12
         elif L1 != 0.0 and L2 == 0.0:
             t1 = L3 / L1
             W1 = 4.0 * C * C - 4.0 * R2 * R2 * C
             W2 = 4.0 * C * (B * t1 + E) - 4.0 * R2 * R2 * (B * t1 + E)
             W3 = pow(B * t1 + E, 2.0) - (A * t1 * t1 + D * t1 + F)
-            t2 = (-W2 - ti.sqrt(W2 * W2 - 4.0 * W1 * W3)) / (2.0 * W1)
+            t21, t22 = get_quadratic_function_solution(W1, W2, W3)
+            dis = surface_distane(m, bary_lerp(m1, m2, m3, t1, t21))
+            t2 = t21
+            if surface_distane(m, bary_lerp(m1, m2, m3, t1, t22)) < dis:
+                t2 = t22
         else:
             H3 = L2 / L1
             K3 = L3 / L1
-            W1 = pow((2.0 * C + B * H3), 2.0) - 4.0 * R2 * \
+            W1 = (2.0 * C + B * H3)**2.0 - 4.0 * R2 * \
                 R2 * (A * H3 * H3 + B * H3 + C)
             W2 = 2.0 * (2.0 * C + B * H3) * (B * K3 + E) - 4.0 * R2 * \
                 R2 * (2.0 * A * H3 * K3 + B * K3 + D * H3 + E)
-            W3 = pow((B * K3 + E), 2.0) - 4.0 * R2 * \
+            W3 = (B * K3 + E)**2.0 - 4.0 * R2 * \
                 R2 * (A * K3 * K3 + D * K3 + F)
-            t2 = (-W2 - ti.sqrt(W2 * W2 - 4.0 * W1 * W3)) / (2.0 * W1)
-            t1 = H3 * t2 + K3
+            t21, t22 = get_quadratic_function_solution(W1, W2, W3)
+            t11, t12 = H3 * t21 + K3, H3 * t22 + K3
+            dis = surface_distane(m, bary_lerp(m1, m2, m3, t11, t21))
+            t1, t2 = t11, t21
+            if surface_distane(m, bary_lerp(m1, m2, m3, t12, t22)) < dis:
+                t1, t2 = t12, t22
 
     if (t1+t2) < 1.0 and 0.0 <= t1 <= 1.0 and 0.0 <= t2 <= 1.0:  # nearest sphere is inside triangle
-        # post-processing t1,t2
-        if inversed13 and not inversed23:
-            t1 = 1-t1-t2
-        elif not inversed13 and inversed23:
-            t2 = 1-t1-t2
-        else:
-            t1, t2 = t2, t1
-            t2 = 1 - t1 - t2
+        pass
     else:  # nearest sphere is on edge
         # first init with cone:{m1,m3}
         t = get_sphere_cone_nearest(m, m1, m3)
@@ -455,21 +466,39 @@ class UnitTest:
             ti_m1, ti_m2, ti_m3, ti_m4, ti_m5)
 
     @ti.kernel
-    def proof_sphere_slab(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr()):
+    def proof_sphere_slab(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr(), steps: ti.i32):
         ti_m1 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
         ti_m2 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
         ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
         ti_m4 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
         self.min_dis[None] = 1000000.0
         min_t1, min_t2 = -1.0, -1.0
-        for i, j in ti.ndrange(5000, 5000):
-            t1, t2 = i / 5000.0, j / 5000.0
+        for i, j in ti.ndrange(steps, steps):
+            t1, t2 = i / ti.cast(steps, ti.f32), j / ti.cast(steps, ti.f32)
             if t1 + t2 <= 1.0:
                 m = bary_lerp(ti_m2, ti_m3, ti_m4, t1, t2)
                 dis = surface_distane(ti_m1, m)
                 if dis < self.min_dis[None]:
                     ti.atomic_min(self.min_dis[None], dis)
                     min_t1, min_t2 = t1, t2
+        print("{},{}".format(min_t1, min_t2))
+
+    @ti.kernel
+    def proof_cone_cone(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr(), steps: ti.i32):
+        ti_m1 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
+        ti_m2 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
+        ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
+        ti_m4 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
+        self.min_dis[None] = 1000000.0
+        min_t1, min_t2 = -1.0, -1.0
+        for i, j in ti.ndrange(steps, steps):
+            t1, t2 = i / ti.cast(steps, ti.f32), j / ti.cast(steps, ti.f32)
+            tm1 = linear_lerp(ti_m1, ti_m2, t1)
+            tm2 = linear_lerp(ti_m3, ti_m4, t2)
+            dis = surface_distane(tm1, tm2)
+            if dis < self.min_dis[None]:
+                ti.atomic_min(self.min_dis[None], dis)
+                min_t1, min_t2 = t1, t2
         print("{},{}".format(min_t1, min_t2))
 
 

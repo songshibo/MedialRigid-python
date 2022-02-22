@@ -16,16 +16,17 @@ def surface_distance(m1, m2):
 
 def TS(mesh, _pos, _scale):
     T = translate_matrix(_pos)
-    scale = np.ones(3) * _scale
+    scale = np.ones(3) * _scale * 2.0
     S = scale_matrix(scale)
     mesh.set_transform(concatenate_matrices(T, S))
 
 
 def register_sphere(name, m, v, f, color, enable=True):
     mesh = ps.register_surface_mesh(name, v, f)
-    TS(mesh, m[:3], m[3] * 2.0)
+    TS(mesh, m[:3], m[3])
     mesh.set_color(color)
     mesh.set_enabled(enable)
+    mesh.set_smooth_shade(True)
     return mesh
 
 
@@ -65,7 +66,8 @@ def update_curve_network():
 
 
 def decom_transform(m):
-    pos = m[0:3, 3]
+    pos = np.array(m[0:3, 3])
+    m[0:3, 3] = np.zeros(3)
     M_without_rot = np.matmul(m, m.T)
     scale = np.sqrt(M_without_rot[0, 0]) * 0.5
     return np.array([pos[0], pos[1], pos[2], scale])
@@ -94,34 +96,38 @@ sp23 = register_sphere("m23", m23, vs, fs, color2, False)
 generate_edge("p2", m21, m22)
 
 u_ins = UnitTest()
+steps = 5000
 
 
 def callback():
-    global m11, m12, m13, m21, m22, m23, unit_test_selected
+    global m11, m12, m13, m21, m22, m23, unit_test_selected, steps
 
-    selected_name = ps.get_selection()[0]
-    if selected_name == "m11":
+    if psimgui.Button("Update from Scene"):
         m11 = decom_transform(ps.get_surface_mesh(
-            selected_name).get_transform())
-        update_curve_network()
-    elif selected_name == "m12":
+            "m11").get_transform())
         m12 = decom_transform(ps.get_surface_mesh(
-            selected_name).get_transform())
-        update_curve_network()
-    elif selected_name == "m21":
+            "m12").get_transform())
         m21 = decom_transform(ps.get_surface_mesh(
-            selected_name).get_transform())
-        update_curve_network()
-    elif selected_name == "m22":
+            "m21").get_transform())
         m22 = decom_transform(ps.get_surface_mesh(
-            selected_name).get_transform())
-        update_curve_network()
-    elif selected_name == "m23":
+            "m22").get_transform())
         m23 = decom_transform(ps.get_surface_mesh(
-            selected_name).get_transform())
+            "m23").get_transform())
         update_curve_network()
-    else:
-        pass
+    psimgui.SameLine()
+    if psimgui.Button("Make Spheres Transparent"):
+        sp11.set_transparency(0.5)
+        sp12.set_transparency(0.5)
+        sp21.set_transparency(0.5)
+        sp22.set_transparency(0.5)
+        sp23.set_transparency(0.5)
+    psimgui.SameLine()
+    if psimgui.Button("Make Spheres Solid"):
+        sp11.set_transparency(1)
+        sp12.set_transparency(1)
+        sp21.set_transparency(1)
+        sp22.set_transparency(1)
+        sp23.set_transparency(1)
 
     psimgui.PushItemWidth(200)
     changed = psimgui.BeginCombo("Unit Test Type", unit_test_selected)
@@ -182,29 +188,57 @@ def callback():
             u_ins.unit_sphere_cone(m11, m21, m22)
             tm = m21 * u_ins.t21[None] + m22 * (1.0 - u_ins.t21[None])
             generate_edge("Nearest", m11, tm)
+            print("[taichi] linear t:{}".format(u_ins.t21[None]))
+            print("[taichi] minimum distance:{}".format(
+                surface_distance(m11, tm)))
         elif unit_test_selected == "Sphere-Slab":
             u_ins.unit_sphere_slab(m11, m21, m22, m23)
             tm = m21 * u_ins.t21[None] + m22 * u_ins.t22[None] + \
                 m23 * (1.0 - u_ins.t21[None] - u_ins.t22[None])
             generate_edge("Nearest", m11, tm)
-            print(surface_distance(m11, tm))
+            print("[taichi] barycentric t1,t2:{},{}".format(
+                u_ins.t21[None], u_ins.t22[None]))
+            print("[taichi] minimum distance:{}".format(
+                surface_distance(m11, tm)))
         elif unit_test_selected == "Cone-Cone":
             u_ins.unit_cone_cone(m11, m12, m21, m22)
             tm1 = m11 * u_ins.t11[None] + m12 * (1.0 - u_ins.t11[None])
             tm2 = m21 * u_ins.t21[None] + m22 * (1.0 - u_ins.t21[None])
             generate_edge("Nearest", tm1, tm2)
+            print("[taichi] linear t1,t2:{},{}".format(
+                u_ins.t11[None], u_ins.t21[None]))
+            print("[taichi] minimum distance:{}".format(
+                surface_distance(tm1, tm2)))
         elif unit_test_selected == "Cone-Slab":
             u_ins.unit_cone_slab(m11, m12, m21, m22, m23)
             tm1 = m11 * u_ins.t11[None] + m12 * (1.0 - u_ins.t11[None])
             tm2 = m21 * u_ins.t21[None] + m22 * u_ins.t22[None] + \
                 m23 * (1.0 - u_ins.t21[None] - u_ins.t22[None])
             generate_edge("Nearest", tm1, tm2)
+            print("[taichi] linear t:{} \t barycentric t1,t2:{},{}".format(
+                u_ins.t11[None], u_ins.t21[None], u_ins.t22[None]))
+            print("[taichi] minimum distance:{}".format(
+                surface_distance(tm1, tm2)))
         else:
             pass
 
+    psimgui.PushItemWidth(150)
+    _, steps = psimgui.InputInt("Steps", steps, step=1, step_fast=100)
+    psimgui.PopItemWidth()
+    psimgui.SameLine()
     if psimgui.Button("Check"):
-        u_ins.proof_sphere_slab(m11, m21, m22, m23)
-        print(u_ins.min_dis[None])
+        if unit_test_selected == "Sphere-Cone":
+            pass
+        elif unit_test_selected == "Sphere-Slab":
+            u_ins.proof_sphere_slab(m11, m21, m22, m23, steps)
+            print(u_ins.min_dis[None])
+        elif unit_test_selected == "Cone-Cone":
+            u_ins.proof_cone_cone(m11, m12, m21, m22, steps)
+            print(u_ins.min_dis[None])
+        elif unit_test_selected == "Cone-Slab":
+            pass
+        else:
+            pass
 
 
 ps.init()
