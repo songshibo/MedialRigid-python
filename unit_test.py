@@ -189,26 +189,26 @@ def callback():
             u_ins.unit_sphere_cone(m11, m21, m22)
             tm = m21 * u_ins.t21[None] + m22 * (1.0 - u_ins.t21[None])
             generate_edge("Nearest", m11, tm)
-            print("[taichi] linear t:{}".format(u_ins.t21[None]))
-            print("[taichi] minimum distance:{}".format(
+            print("[Medial-Rigid] linear t:{}".format(u_ins.t21[None]))
+            print("[Medial-Rigid] minimum surface distance:{}".format(
                 surface_distance(m11, tm)))
         elif unit_test_selected == "Sphere-Slab":
             u_ins.unit_sphere_slab(m11, m21, m22, m23)
             tm = m21 * u_ins.t21[None] + m22 * u_ins.t22[None] + \
                 m23 * (1.0 - u_ins.t21[None] - u_ins.t22[None])
             generate_edge("Nearest", m11, tm)
-            print("[taichi] barycentric t1,t2:{},{}".format(
+            print("[Medial-Rigid] barycentric t1,t2:{},{}".format(
                 u_ins.t21[None], u_ins.t22[None]))
-            print("[taichi] minimum distance:{}".format(
+            print("[Medial-Rigid] minimum surface distance:{}".format(
                 surface_distance(m11, tm)))
         elif unit_test_selected == "Cone-Cone":
             u_ins.unit_cone_cone(m11, m12, m21, m22)
             tm1 = m11 * u_ins.t11[None] + m12 * (1.0 - u_ins.t11[None])
             tm2 = m21 * u_ins.t21[None] + m22 * (1.0 - u_ins.t21[None])
             generate_edge("Nearest", tm1, tm2)
-            print("[taichi] linear t1,t2:{},{}".format(
+            print("[Medial-Rigid] linear t1,t2:{},{}".format(
                 u_ins.t11[None], u_ins.t21[None]))
-            print("[taichi] minimum distance:{}".format(
+            print("[Medial-Rigid] minimum surface distance:{}".format(
                 surface_distance(tm1, tm2)))
         elif unit_test_selected == "Cone-Slab":
             u_ins.unit_cone_slab(m11, m12, m21, m22, m23)
@@ -216,18 +216,20 @@ def callback():
             tm2 = m21 * u_ins.t21[None] + m22 * u_ins.t22[None] + \
                 m23 * (1.0 - u_ins.t21[None] - u_ins.t22[None])
             generate_edge("Nearest", tm1, tm2)
-            print("[taichi] linear t:{} \t barycentric t1,t2:{},{}".format(
+            print("[Medial-Rigid] linear t:{} \t barycentric t1,t2:{},{}".format(
                 u_ins.t11[None], u_ins.t21[None], u_ins.t22[None]))
-            print("[taichi] minimum distance:{}".format(
+            print("[Medial-Rigid] minimum surface distance:{}".format(
                 surface_distance(tm1, tm2)))
         else:
             pass
     psimgui.SameLine()
     if psimgui.Button("Intersection Test"):
         if unit_test_selected == "Sphere-Cone":
-            pass
+            ps.info(
+                "Intersection test of Sphere-Cone is simply finding the neareset sphere on cone.")
         elif unit_test_selected == "Sphere-Slab":
-            pass
+            ps.info(
+                "Intersection test of Sphere-Slab is simply finding the neareset sphere on slab.")
         elif unit_test_selected == "Cone-Cone":
             r = u_ins.unit_detect_cone_cone(m11, m12, m21, m22)
             print("Intersected:{}".format(r == 1))
@@ -243,17 +245,16 @@ def callback():
     psimgui.SameLine()
     if psimgui.Button("Check"):
         if unit_test_selected == "Sphere-Cone":
-            pass
+            u_ins.proof_sphere_cone(m11, m21, m22, steps)
         elif unit_test_selected == "Sphere-Slab":
             u_ins.proof_sphere_slab(m11, m21, m22, m23, steps)
-            print(u_ins.min_dis[None])
         elif unit_test_selected == "Cone-Cone":
             u_ins.proof_cone_cone(m11, m12, m21, m22, steps)
-            print(u_ins.min_dis[None])
         elif unit_test_selected == "Cone-Slab":
-            pass
+            u_ins.proof_cone_slab(m11, m12, m21, m22, m23, steps)
         else:
             pass
+        print("[Medial-Rigid] Searched minimum distance:{}".format(u_ins.min_dis[None]))
 
 
 ps.init()

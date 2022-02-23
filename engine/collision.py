@@ -595,23 +595,23 @@ class UnitTest:
         self.min_dis = ti.field(ti.f32, shape=())
 
     @ti.kernel
-    def unit_detect_cone_cone(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr()) -> ti.int64:
+    def unit_detect_cone_cone(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr()) -> ti.int32:
         ti_m1 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
         ti_m2 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
         ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
         ti_m4 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
         intersected = detect_cone_cone(ti_m1, ti_m2, ti_m3, ti_m4)
-        return ti.cast(intersected, ti.int64)
+        return ti.cast(intersected, ti.int32)
 
     @ti.kernel
-    def unit_detect_cone_slab(self,  m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr(), m5: ti.any_arr()) -> ti.int64:
+    def unit_detect_cone_slab(self,  m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr(), m5: ti.any_arr()) -> ti.int32:
         ti_m1 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
         ti_m2 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
         ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
         ti_m4 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
         ti_m5 = ti.Vector([m5[0], m5[1], m5[2], m5[3]])
         intersected = detect_cone_slab(ti_m1, ti_m2, ti_m3, ti_m4, ti_m5)
-        return ti.cast(intersected, ti.int64)
+        return ti.cast(intersected, ti.int32)
 
     @ti.kernel
     def unit_sphere_cone(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr()):
@@ -649,11 +649,17 @@ class UnitTest:
             ti_m1, ti_m2, ti_m3, ti_m4, ti_m5)
 
     @ti.kernel
-    def proof_sphere_cone(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr()):
+    def proof_sphere_cone(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), steps: ti.i32):
         ti_m1 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
         ti_m2 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
         ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
         self.min_dis[None] = 1000000.0
+        self.t21[None] = 2.0
+        for i in range(steps):
+            t = i / ti.cast(steps, ti.f32)
+            m = linear_lerp(ti_m2, ti_m3, t)
+            dis = surface_distane(ti_m1, m)
+            ti.atomic_min(self.min_dis[None], dis)
 
     @ti.kernel
     def proof_sphere_slab(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr(), steps: ti.i32):
@@ -662,16 +668,14 @@ class UnitTest:
         ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
         ti_m4 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
         self.min_dis[None] = 1000000.0
-        min_t1, min_t2 = -1.0, -1.0
-        for i, j in ti.ndrange(steps, steps):
-            t1, t2 = i / ti.cast(steps, ti.f32), j / ti.cast(steps, ti.f32)
+        real_steps = max(steps, 31620)
+        for i, j in ti.ndrange(real_steps, real_steps):
+            t1, t2 = i / ti.cast(real_steps, ti.f32), j / \
+                ti.cast(real_steps, ti.f32)
             if t1 + t2 <= 1.0:
                 m = bary_lerp(ti_m2, ti_m3, ti_m4, t1, t2)
                 dis = surface_distane(ti_m1, m)
-                if dis < self.min_dis[None]:
-                    ti.atomic_min(self.min_dis[None], dis)
-                    min_t1, min_t2 = t1, t2
-        print("{},{}".format(min_t1, min_t2))
+                ti.atomic_min(self.min_dis[None], dis)
 
     @ti.kernel
     def proof_cone_cone(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr(), steps: ti.i32):
@@ -680,13 +684,28 @@ class UnitTest:
         ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
         ti_m4 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
         self.min_dis[None] = 1000000.0
-        min_t1, min_t2 = -1.0, -1.0
-        for i, j in ti.ndrange(steps, steps):
-            t1, t2 = i / ti.cast(steps, ti.f32), j / ti.cast(steps, ti.f32)
+        real_steps = max(steps, 31620)
+        for i, j in ti.ndrange(real_steps, real_steps):
+            t1, t2 = i / ti.cast(real_steps, ti.f32), j / ti.cast(real_steps, ti.f32)
             tm1 = linear_lerp(ti_m1, ti_m2, t1)
             tm2 = linear_lerp(ti_m3, ti_m4, t2)
             dis = surface_distane(tm1, tm2)
-            if dis < self.min_dis[None]:
+            ti.atomic_min(self.min_dis[None], dis)
+
+    @ti.kernel
+    def proof_cone_slab(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr(), m5: ti.any_arr(), steps: ti.i32):
+        ti_m1 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
+        ti_m2 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
+        ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
+        ti_m4 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
+        ti_m5 = ti.Vector([m5[0], m5[1], m5[2], m5[3]])
+        self.min_dis[None] = 1000000.0
+        real_steps = max(steps, 1000)
+        for i, j, k in ti.ndrange(real_steps, real_steps, real_steps):
+            t1, t2, t3 = i / ti.cast(real_steps, ti.f32), j / \
+                ti.cast(real_steps, ti.f32), k / ti.cast(real_steps, ti.f32)
+            if t2 + t3 <= 1.0:
+                tm1 = linear_lerp(ti_m1, ti_m2, t1)
+                tm2 = bary_lerp(ti_m3, ti_m4, ti_m5, t2, t3)
+                dis = surface_distane(tm1, tm2)
                 ti.atomic_min(self.min_dis[None], dis)
-                min_t1, min_t2 = t1, t2
-        print("{},{}".format(min_t1, min_t2))
