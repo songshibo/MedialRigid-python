@@ -1,4 +1,3 @@
-from matplotlib.pyplot import step
 import taichi as ti
 import numpy as np
 import taichi_glsl as ts
@@ -411,16 +410,7 @@ def get_cone_slab_nearest(m11: ti.template(), m12: ti.template(), m21: ti.templa
     return t1, t2, t3
 
 
-cq = ti.Vector([0.0, 0.5, 0.5, 0.3])
-cone_m1 = ti.Vector([0.5, 0.0, 0.0, 0.35])
-cone_m2 = ti.Vector([-0.5, 0.0, 0.0, 0.5])
-# cone_m3 = ti.Vector([0.5, 0.0, 1.0, 0.2])
-# cone_m4 = ti.Vector([0.0, 0.0, 0.0, 0.15])
-
-# s = ti.field(ti.f32, shape=())
-# s[None] = 0
-
-
+# for unit test
 @ti.data_oriented
 class UnitTest:
     def __init__(self):
@@ -500,32 +490,3 @@ class UnitTest:
                 ti.atomic_min(self.min_dis[None], dis)
                 min_t1, min_t2 = t1, t2
         print("{},{}".format(min_t1, min_t2))
-
-
-@ti.kernel
-def unit_test():
-    t = get_sphere_cone_nearest(cq, cone_m1, cone_m2)
-    print(t)
-    # t1, t2 = get_cone_cone_nearest(cq, cone_m1, cone_m2, cone_m3)
-    # print(get_sphere_cone_nearest(cq, cone_m1, cone_m2))
-    # t1, t2 = get_sphere_slab_nearest(cq, cone_m1, cone_m2, cone_m3)
-    # t1, t2, t3 = get_cone_slab_nearest(cq, cone_m1, cone_m2, cone_m3, cone_m4)
-    # print("t1:{},t2:{},t3:{}".format(t1, t2, t3))
-    # min_dis = surface_distane(cq, bary_lerp(cone_m1, cone_m2, cone_m3, t1, t2))...............................................................
-    # min_dis = surface_distane(linear_lerp(
-    #     cq, cone_m1, t1), linear_lerp(cone_m2, cone_m3, t2))
-    # min_dis = surface_distane(linear_lerp(cq, cone_m1, t1), bary_lerp(
-    #     cone_m2, cone_m3, cone_m4, t2, t3))
-    # print(min_dis)
-    # for i, j in ti.ndrange(1000, 1000):
-    #     t1, t2 = get_sphere_slab_nearest(cq, cone_m1, cone_m2, cone_m3)
-    #     min_dis = surface_distane(cq, bary_lerp(
-    #         cone_m1, cone_m2, cone_m3, t1, t2))
-    #     ti.atomic_max(s[None], min_dis)
-    # print(s[None])
-
-    # unit_test()
-    # ti.print_kernel_profile_info()
-
-
-# unit_test()
