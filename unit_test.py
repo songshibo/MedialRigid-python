@@ -80,7 +80,7 @@ m12 = np.array([0.0, 1.0, 0.0, 0.45])
 # second
 m21 = np.array([0.5, 0.0, 0.0, 0.35])
 m22 = np.array([-0.5, 0.0, 0.0, 0.5])
-m23 = np.array([0.0, 0.0, -0.3, 0.2])
+m23 = np.array([0.0, 0.0, -0.6, 0.2])
 
 color1 = np.array([235.0, 64.0, 52.0, 255.0]) / 255.0
 color2 = np.array([52.0, 177.0, 235.0, 255.0]) / 255.0
@@ -220,6 +220,20 @@ def callback():
                 u_ins.t11[None], u_ins.t21[None], u_ins.t22[None]))
             print("[taichi] minimum distance:{}".format(
                 surface_distance(tm1, tm2)))
+        else:
+            pass
+    psimgui.SameLine()
+    if psimgui.Button("Intersection Test"):
+        if unit_test_selected == "Sphere-Cone":
+            pass
+        elif unit_test_selected == "Sphere-Slab":
+            pass
+        elif unit_test_selected == "Cone-Cone":
+            r = u_ins.unit_detect_cone_cone(m11, m12, m21, m22)
+            print("Intersected:{}".format(r == 1))
+        elif unit_test_selected == "Cone-Slab":
+            r = u_ins.unit_detect_cone_slab(m11, m12, m21, m22, m23)
+            print("Intersected:{}".format(r == 1))
         else:
             pass
 

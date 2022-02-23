@@ -1,8 +1,5 @@
 import taichi as ti
-import numpy as np
 import taichi_glsl as ts
-
-# ti.init(arch=ti.gpu, debug=True, kernel_profiler=True)
 
 
 @ti.func
@@ -57,10 +54,26 @@ def is_segement_intersect_with_triangle(e1, e2, A, B, C):
     return intersected, t1, t2, t3
 
 
+# solve Ax^2 + Bx + C = 0
 @ti.func
-def get_quadratic_function_solution(W1, W2, W3):
-    delta = ti.sqrt(W2 * W2 - 4.0 * W1 * W3)
-    return (-W2 - delta) / (2.0 * W1), (-W2 + delta) / (2.0 * W1)
+def solve_quadratic(A, B, C):
+    has_solution, root1, root2 = True, -1.0, -1.0
+    if A == 0.0:  # degnerated case
+        if B != 0.0:
+            root1 = -C / B
+            root2 = root1
+    else:
+        delta = B*B - 4.0 * A * C
+        if delta < 0.0:
+            has_solution = False
+        else:
+            root1 = (-B - ti.sqrt(delta)) / (2 * A)
+            root2 = (-B + ti.sqrt(delta)) / (2 * A)
+    return has_solution, root1, root2
+
+#######################################
+## Finding Neareset Sphere Algorithm ##
+#######################################
 
 
 @ti.func
@@ -115,7 +128,7 @@ def get_sphere_slab_nearest(m: ti.template(), m1: ti.template(), m2: ti.template
     E = 2.0 * ts.dot(c32, cm3)
     F = ts.dot(cm3, cm3)
 
-    t1, t2 = 0.0, 0.0
+    t1, t2 = -1.0, -1.0
     if R1 == 0.0 and R2 == 0.0:
         denom = (4.0*A*C-B*B)
         t1 = (B*E - 2.0*C*D)/denom
@@ -129,7 +142,7 @@ def get_sphere_slab_nearest(m: ti.template(), m1: ti.template(), m2: ti.template
             R1 * (B * K2 + 2.0 * C * H2 * K2 + D + E * H2)
         W3 = pow(B * K2 + D, 2.0) - 4.0 * R1 * \
             R1 * (C * K2 * K2 + E * K2 + F)
-        t11, t12 = get_quadratic_function_solution(W1, W2, W3)
+        _, t11, t12 = solve_quadratic(W1, W2, W3)
         t21, t22 = H2 * t11 + K2, H2 * t12 + K2
         dis = surface_distane(m, bary_lerp(m1, m2, m3, t11, t21))
         t1, t2 = t11, t21
@@ -144,7 +157,7 @@ def get_sphere_slab_nearest(m: ti.template(), m1: ti.template(), m2: ti.template
             R2 * (B * K1 + 2.0 * A * H1 * K1 + E + D * H1)
         W3 = pow(B * K1 + E, 2.0) - 4.0 * R2 * \
             R2 * (A * K1 * K1 + D * K1 + F)
-        t21, t22 = get_quadratic_function_solution(W1, W2, W3)
+        _, t21, t22 = solve_quadratic(W1, W2, W3)
         t11, t12 = H1 * t21 + K1, H1 * t22 + K1
         dis = surface_distane(m, bary_lerp(m1, m2, m3, t11, t21))
         t1, t2 = t11, t21
@@ -159,7 +172,7 @@ def get_sphere_slab_nearest(m: ti.template(), m1: ti.template(), m2: ti.template
             W1 = 4.0 * A * A - 4.0 * R1 * R1 * A
             W2 = 4.0 * A * (B * t2 + D) - 4.0 * R1 * R1 * (B * t2 + D)
             W3 = pow(B * t2 + D, 2.0) - (C * t2 * t2 + E * t2 + F)
-            t11, t12 = get_quadratic_function_solution(W1, W2, W3)
+            _, t11, t12 = solve_quadratic(W1, W2, W3)
             dis = surface_distane(m, bary_lerp(m1, m2, m3, t11, t2))
             t1 = t11
             if surface_distane(m, bary_lerp(m1, m2, m3, t12, t2)) < dis:
@@ -169,7 +182,7 @@ def get_sphere_slab_nearest(m: ti.template(), m1: ti.template(), m2: ti.template
             W1 = 4.0 * C * C - 4.0 * R2 * R2 * C
             W2 = 4.0 * C * (B * t1 + E) - 4.0 * R2 * R2 * (B * t1 + E)
             W3 = pow(B * t1 + E, 2.0) - (A * t1 * t1 + D * t1 + F)
-            t21, t22 = get_quadratic_function_solution(W1, W2, W3)
+            _, t21, t22 = solve_quadratic(W1, W2, W3)
             dis = surface_distane(m, bary_lerp(m1, m2, m3, t1, t21))
             t2 = t21
             if surface_distane(m, bary_lerp(m1, m2, m3, t1, t22)) < dis:
@@ -183,7 +196,7 @@ def get_sphere_slab_nearest(m: ti.template(), m1: ti.template(), m2: ti.template
                 R2 * (2.0 * A * H3 * K3 + B * K3 + D * H3 + E)
             W3 = (B * K3 + E)**2.0 - 4.0 * R2 * \
                 R2 * (A * K3 * K3 + D * K3 + F)
-            t21, t22 = get_quadratic_function_solution(W1, W2, W3)
+            _, t21, t22 = solve_quadratic(W1, W2, W3)
             t11, t12 = H3 * t21 + K3, H3 * t22 + K3
             dis = surface_distane(m, bary_lerp(m1, m2, m3, t11, t21))
             t1, t2 = t11, t21
@@ -245,7 +258,7 @@ def get_cone_cone_nearest(m11: ti.template(), m12: ti.template(), m21: ti.templa
     E = -2.0 * ts.dot(c22c21, c22c12)
     F = ts.dot(c22c12, c22c12)
 
-    t1, t2 = 0.0, 0.0
+    t1, t2 = -1.0, -1.0
     # cone:{m11,m12} parallel to cone:{m21,m22}
     if (4.0 * A * C - B * B) == 0.0:
         # find minimum distance
@@ -410,6 +423,167 @@ def get_cone_slab_nearest(m11: ti.template(), m12: ti.template(), m21: ti.templa
     return t1, t2, t3
 
 
+##################################
+## Check Intersection Algorithm ##
+##################################
+@ti.func
+def value_of_quadratic_surface_2D(x, y, A, B, C, D, E, F):
+    return A*x*x + B*x*y + C*y*y + D*x + E*y + F
+
+
+@ti.func
+def value_of_quadratic_surface_3D(x,  y,  z,  A1,  A2,  A3,  A4,  A5,  A6,  A7,  A8,  A9,  A10):
+    return A1 * x*x + A2 * y*y + A3 * z*z + A4 * x*y + A5 * x*z + A6 * y*z + A7 * x + A8 * y + A9 * z + A10
+
+
+@ti.func
+def detect_cone_cone_param(A, B, C, D, E, F, space_triangle):
+    # Ax^2 + By^2 + Cxy + Dx + Ey + F = 0
+    min_dis = 1.0
+    # case 1 x = 0, y = 0
+    if (D >= 0.0 and E >= 0.0):
+        f = value_of_quadratic_surface_2D(0.0, 0.0, A, B, C, D, E, F)
+        min_dis = f if f < min_dis else min_dis
+    # case 2 x=0, y != 0,1
+    E2C = -1.0 * (E / (2.0 * C))
+    if (E2C > 0.0 and E2C < 1.0):
+        DB = B * E2C + D
+        if (DB >= 0.0):
+            f = value_of_quadratic_surface_2D(0.0, E2C, A, B, C, D, E, F)
+            min_dis = f if f < min_dis else min_dis
+    # case 3 x= 0, y=1
+    if (B+D) >= 0.0 and (2.0*C+E) <= 0.0:
+        f = value_of_quadratic_surface_2D(0.0, 1.0, A, B, C, D, E, F)
+        min_dis = f if f < min_dis else min_dis
+    # case 4 x!=0,1, y=0
+    if A != 0.0:
+        D2A = -D / (2.0 * A)
+        if 0.0 < D2A < 1.0:
+            EB = B * D2A + E
+            if EB >= 0.0:
+                f = value_of_quadratic_surface_2D(D2A, 0.0, A, B, C, D, E, F)
+                min_dis = f if f < min_dis else min_dis
+    # case 5 x!=0,1 y != 0,1
+    delta = 4.0 * A * C - B * B
+    if delta != 0.0:
+        x = (B * E - 2.0 * C * D) / delta
+        y = (B * D - 2.0 * A * E) / delta
+        if 0.0 < x < 1.0 and 0.0 < y < 1.0:
+            if not space_triangle:
+                f = value_of_quadratic_surface_2D(x, y, A, B, C, D, E, F)
+                min_dis = f if f < min_dis else min_dis
+            else:
+                if 0.0 < x+y <= 1.0:
+                    f = value_of_quadratic_surface_2D(x, y, A, B, C, D, E, F)
+                    min_dis = f if f < min_dis else min_dis
+
+    # case 7 x=1 y=0
+    if -(2 * A + D) >= 0.0 and B+E >= 0.0:
+        f = value_of_quadratic_surface_2D(1.0, 0.0, A, B, C, D, E, F)
+        min_dis = f if f < min_dis else min_dis
+
+    if not space_triangle:
+        # case 6 x != 0,1 y =1
+        if A != 0.0:
+            x = -(B+D) / (2.0 * A)
+            CBE = 2.0 * C - (B*B + B * D) / (2.0 * A) + E
+            if 0.0 < x < 1.0 and CBE <= 0.0:
+                f = value_of_quadratic_surface_2D(x, 1.0, A, B, C, D, E, F)
+                min_dis = f if f < min_dis else min_dis
+        # case 8 x=1 y!=0,1
+        y = -(B+E) / (2.0 * C)
+        ABD = 2.0 * A - (B*B+B*E) / (2.0 * C) + D
+        if 0.0 < y < 1.0 and ABD <= 0.0:
+            f = value_of_quadratic_surface_2D(1.0, y, A, B, C, D, E, F)
+            min_dis = f if f < min_dis else min_dis
+        # case 9 x=1,y=1
+        ABD = -(2.0 * A + B + D)
+        CBE = -(2.0 * C + B + E)
+        if ABD >= 0.0 and CBE >= 0.0:
+            f = value_of_quadratic_surface_2D(1.0, 1.0, A, B, C, D, E, F)
+            min_dis = f if f < min_dis else min_dis
+
+    return min_dis <= 0.0
+
+
+@ti.func
+def detect_cone_slab_param(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10):
+    # z = 0, x,y in [0,1]
+    intersected = detect_cone_cone_param(A1, A4, A2, A7, A8, A10, False)
+    # y = 0, x,z in [0,1]
+    if not intersected:
+        intersected = detect_cone_cone_param(A1, A5, A3, A7, A9, A10, False)
+    # x = 0, y+z <= 1, y>=0, z>=0
+    if not intersected:
+        intersected = detect_cone_cone_param(A2, A6, A3, A8, A9, A10, True)
+    # x = 1; y+z <=1, y>=0,z>=0
+    if not intersected:
+        intersected = detect_cone_cone_param(
+            A2, A6, A3, A4 + A8, A5 + A9, A1 + A7 + A10, True)
+    # x in [0,1]; y+z = 1, y>=0,z>=0
+    if not intersected:
+        intersected = detect_cone_cone_param(
+            A1, A4 - A5, A2 + A3 - A6, A5 + A7, A6 + A8 - A9 - 2.0*A3, A3 + A9 + A10, False)
+
+    # x in [0,1]; y+z <= 1, y,z >=0
+    if not intersected:
+        mat = ti.Matrix([
+            [2.0 * A1, A4, A5],
+            [A4, 2.0 * A2, A6],
+            [A5, A6, 2.0 * A3]
+        ])
+        b = ti.Vector([-A7, -A8, -A9])
+        solve = mat.inverse() @ b
+        if 0.0 <= solve.x <= 1.0 and 0.0 <= solve.y <= 1.0 and 0.0 <= solve.z <= 1.0 and (0.0 <= (solve.y + solve.z) <= 1.0):
+            intersected = (value_of_quadratic_surface_3D(
+                solve.x, solve.y, solve.z, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10) <= 0.0)
+
+    return intersected
+
+
+@ti.func
+def detect_cone_cone(m11: ti.template(), m12: ti.template(), m21: ti.template(), m22: ti.template()):
+    r11, r12, r21, r22 = ti.static(m11.w, m12.w, m21.w, m22.w)
+
+    c12c11 = ti.Vector([m11.x-m12.x, m11.y-m12.y, m11.z-m12.z])
+    c22c21 = ti.Vector([m21.x-m22.x, m21.y-m22.y, m21.z-m22.z])
+    c22c12 = ti.Vector([m12.x-m22.x, m12.y-m22.y, m12.z-m22.z])
+
+    R1 = r11 - r12
+    R2 = r21 - r22
+    R3 = r12 + r22
+
+    A = ts.dot(c12c11, c12c11) - R1*R1
+    B = -2.0 * ts.dot(c12c11, c22c21) - 2.0*R1*R2
+    C = ts.dot(c22c21, c22c21) - R2*R2
+    D = 2.0 * ts.dot(c12c11, c22c12) - 2.0*R1*R3
+    E = -2.0 * ts.dot(c22c21, c22c12) - 2.0*R2*R3
+    F = ts.dot(c22c12, c22c12) - R3*R3
+    return detect_cone_cone_param(A, B, C, D, E, F, False)
+
+
+@ti.func
+def detect_cone_slab(m11: ti.template(), m12: ti.template(), m21: ti.template(), m22: ti.template(), m23: ti.template()):
+    r11, r12, r21, r22, r23 = ti.static(m11.w, m12.w, m21.w, m22.w, m23.w)
+    c12c11 = ti.Vector([m11.x-m12.x, m11.y-m12.y, m11.z-m12.z])
+    c23c21 = ti.Vector([m21.x-m23.x, m21.y-m23.y, m21.z-m23.z])
+    c23c22 = ti.Vector([m22.x-m23.x, m22.y-m23.y, m22.z-m23.z])
+    c23c12 = ti.Vector([m12.x-m23.x, m12.y-m23.y, m12.z-m23.z])
+
+    A1 = ts.dot(c12c11, c12c11) - (r11 - r12)*(r11 - r12)
+    A2 = ts.dot(c23c21, c23c21) - (r21 - r23)*(r21 - r23)
+    A3 = ts.dot(c23c22, c23c22) - (r22 - r23)*(r22 - r23)
+    A4 = -2.0*(ts.dot(c12c11, c23c21) + (r11 - r12)*(r21 - r23))
+    A5 = -2.0*(ts.dot(c12c11, c23c22) + (r11 - r12)*(r22 - r23))
+    A6 = 2.0*(ts.dot(c23c21, c23c22) - (r21 - r23)*(r22 - r23))
+    A7 = 2.0*(ts.dot(c23c12, c12c11) - (r11 - r12)*(r12 + r23))
+    A8 = -2.0*(ts.dot(c23c12, c23c21) + (r21 - r23)*(r12 + r23))
+    A9 = -2.0*(ts.dot(c23c12, c23c22) + (r22 - r23)*(r12 + r23))
+    A10 = ts.dot(c23c12, c23c12) - (r12 + r23)*(r12 + r23)
+
+    return detect_cone_slab_param(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10)
+
+
 # for unit test
 @ti.data_oriented
 class UnitTest:
@@ -419,6 +593,25 @@ class UnitTest:
         self.t21 = ti.field(ti.f32, shape=())
         self.t22 = ti.field(ti.f32, shape=())
         self.min_dis = ti.field(ti.f32, shape=())
+
+    @ti.kernel
+    def unit_detect_cone_cone(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr()) -> ti.int64:
+        ti_m1 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
+        ti_m2 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
+        ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
+        ti_m4 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
+        intersected = detect_cone_cone(ti_m1, ti_m2, ti_m3, ti_m4)
+        return ti.cast(intersected, ti.int64)
+
+    @ti.kernel
+    def unit_detect_cone_slab(self,  m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr(), m5: ti.any_arr()) -> ti.int64:
+        ti_m1 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
+        ti_m2 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
+        ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
+        ti_m4 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
+        ti_m5 = ti.Vector([m5[0], m5[1], m5[2], m5[3]])
+        intersected = detect_cone_slab(ti_m1, ti_m2, ti_m3, ti_m4, ti_m5)
+        return ti.cast(intersected, ti.int64)
 
     @ti.kernel
     def unit_sphere_cone(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr()):
@@ -454,6 +647,13 @@ class UnitTest:
         ti_m5 = ti.Vector([m5[0], m5[1], m5[2], m5[3]])
         self.t11[None], self.t21[None], self.t22[None] = get_cone_slab_nearest(
             ti_m1, ti_m2, ti_m3, ti_m4, ti_m5)
+
+    @ti.kernel
+    def proof_sphere_cone(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr()):
+        ti_m1 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
+        ti_m2 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
+        ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
+        self.min_dis[None] = 1000000.0
 
     @ti.kernel
     def proof_sphere_slab(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr(), steps: ti.i32):
