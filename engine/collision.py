@@ -584,6 +584,120 @@ def detect_cone_slab(m11: ti.template(), m12: ti.template(), m21: ti.template(),
     return detect_cone_slab_param(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10)
 
 
+@ti.func
+def advance_medial_sphere(m: ti.template(), v: ti.template(), t: ti.f32):
+    return ti.Vector([m.x + v.x*t, m.y + v.y*t, m.z + v.z*t, m.w])
+
+
+@ti.func
+def find_cloeset_t(P1, P2, P3, Sr):
+    # S = (P1 t^2 + P2 t + P3)^{1/2} - Sr
+    C = P3 - Sr*Sr
+    t = -1.0
+    # Both spheres are contact each other
+    valid = not (P1 == 0.0 and P2 == 0.0 and C == 0.0)
+    if not valid:
+        has_solution, t1, t2 = solve_quadratic(P1, P2, C)
+        if has_solution:
+            t = ts.clamp(min(t1, t2))
+        else:
+            d1 = ti.sqrt(P1 + P2 + P3) - Sr
+            if (ti.sqrt(P3) - Sr) < d1:
+                t = 0.0
+            else:
+                t = 1.0
+    return valid
+
+
+@ti.func
+def get_cone_cone_toi(m11: ti.template(), m12: ti.template(), m21: ti.template(), m22: ti.template(), v11: ti.template(), v12: ti.template(), v21: ti.template(), v22: ti.template()):
+    c11 = ti.Vector([m11.x, m11.y, m11.z])
+    c12 = ti.Vector([m12.x, m12.y, m12.z])
+    c21 = ti.Vector([m21.x, m21.y, m21.z])
+    c22 = ti.Vector([m22.x, m22.y, m22.z])
+    r11, r12, r21, r22 = ti.static(m11.w, m12.w, m21.w, m22.w)
+
+    c12c11 = c11-c12
+    c22c21 = c21-c22
+    c22c12 = c12-c22
+    v12v11 = v11-v12
+    v22v21 = v21-v22
+    v22v12 = v12-v22
+
+    # t is time, x,y are the linear interpolation parameters
+    # ci = c12+v12*t + (c11-c12+v11*t-v12*t) * x = c12+v12*t + (c12c11+v12v11*t) * x
+    # cj = c22+v22*t + (c21-c22+v21*t-v22*t) * y = c22+v22*t + (c22c21+v22v21*t) * y
+    # Sc^2 = ||ci-cj||^2
+    # = (A1t^2+A2t+A3)x^2 + (B1t^2+B2t+B3)y^2 + Ct^2 + (D1t^2+D2t+D3)xy + (E1t+E2)xt + (F1t+F2)yt + (G1t+G2)x + (H1t+H2)y + It + J
+    # = (A1t^2+A2t+A3)x^2 + (B1t^2+B2t+B3)y^2 + (D1t^2+D2t+D3)xy + [E1t^2+(E2+G1)t+G2]x + [F1t^2+(F2+H1)t+H2]y + Ct^2 + It + J
+
+    # x^2
+    A1 = ts.sqrLength(v12v11)
+    A2 = 2.0 * ts.dot(c12c11, v12v11)
+    A3 = ts.sqrLength(c12c11)
+    # y^2
+    B1 = ts.sqrLength(v22v21)
+    B2 = 2.0 * ts.dot(c22c21, v22v21)
+    B3 = ts.sqrLength(c22c21)
+    # xy
+    D1 = -2.0 * ts.dot(v12v11, v22v21)
+    D2 = -2.0 * (ts.dot(v12v11, c22c21) + ts.dot(v22v21, c12c11))
+    D3 = -2.0 * ts.dot(c12c11, c22c21)
+    # x
+    E1 = 2.0 * ts.dot(v12v11, v22v12)
+    E2 = 2.0 * ts.dot(c12c11, v22v12)
+    G1 = 2.0 * ts.dot(c22c12, v12v11)
+    G2 = 2.0 * ts.dot(c12c11, c22c12)
+    # y
+    F1 = -2.0 * ts.dot(v22v21, v22v12)
+    F2 = -2.0 * ts.dot(c22c21, v22v12)
+    H1 = -2.0 * ts.dot(c22c12, v22v21)
+    H2 = -2.0 * ts.dot(c22c21, c22c12)
+    # t
+    C = ts.sqrLength(v22v12)
+    I = 2.0 * ts.dot(v22v12, c22c12)
+    J = ts.sqrLength(c22c12)
+
+    # Sr = (r11-r12)*x + (r21-r22)*y + r12+r22
+    #    = R1 * x + R2 * y + R3
+    R1, R2, R3 = r11-r12, r21-r22, r12+r22
+
+    # time interval [t0,t1] (mapping to [0,1])
+    t = 1.0  # start with initial value as t1
+    iter_num = 0  # keep tracking iteration numbers
+    x, y = -1.0, -1.0
+    while (iter_num < 20):
+        iter_num += 1
+        m11t = advance_medial_sphere(m11, v11, t)
+        m12t = advance_medial_sphere(m12, v12, t)
+        m21t = advance_medial_sphere(m21, v21, t)
+        m22t = advance_medial_sphere(m22, v22, t)
+        # finding neareset sphere at t
+        x, y = get_cone_cone_nearest(m11t, m12t, m21t, m22t)
+        dis = surface_distane(linear_lerp(m11t, m12t, x),
+                              linear_lerp(m21t, m22t, y))
+
+        # finding cloesest moment of sphere x,y
+        # squared distance between 2 spheres
+        # S = Sc^(1/2) - Sr = (P1 t^2 + P2 t + P3)^(1/2) - Sr, S=0 means contact
+        P1 = A1*x*x+B1*y*y+D1*x*y+E1*x+F1*y+C
+        P2 = A2 * x * x + B2 * y * y + D2 * x * \
+            y + (E2 + G1) * x + (F2 + H1) * y + I
+        P3 = D3 * x * y + G2 * x + H2 * y + J + A3 * x * x + B3 * y * y
+        Sr = R1 * x + R2 * y + R3
+
+        if dis == 0.0:
+            break
+
+        # dS/dt = 2((P1 t^2 + P2 t + P3)^(1/2) - Sr) * (2P1 t + P2)/[2*(P1 t^2 + P2 t + P3)^(1/2)]
+        if P1 == 0.0 and P2 == 0.0 and (P3 - Sr**2) == 0.0:
+            break  # keeps contacting, ignore
+
+        has_solution, t1, t2 = solve_quadratic(P1, P2, P3-Sr**2)
+
+    return t, x, y
+
+
 # for unit test
 @ti.data_oriented
 class UnitTest:
@@ -686,7 +800,8 @@ class UnitTest:
         self.min_dis[None] = 1000000.0
         real_steps = max(steps, 31620)
         for i, j in ti.ndrange(real_steps, real_steps):
-            t1, t2 = i / ti.cast(real_steps, ti.f32), j / ti.cast(real_steps, ti.f32)
+            t1, t2 = i / ti.cast(real_steps, ti.f32), j / \
+                ti.cast(real_steps, ti.f32)
             tm1 = linear_lerp(ti_m1, ti_m2, t1)
             tm2 = linear_lerp(ti_m3, ti_m4, t2)
             dis = surface_distane(tm1, tm2)
@@ -709,3 +824,10 @@ class UnitTest:
                 tm2 = bary_lerp(ti_m3, ti_m4, ti_m5, t2, t3)
                 dis = surface_distane(tm1, tm2)
                 ti.atomic_min(self.min_dis[None], dis)
+
+    @ti.kernel
+    def moving_cone_cone(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr(), v11: ti.any_arr(), v12: ti.any_arr(), v21: ti.any_arr(), v22: ti.any_arr(), steps: ti.i32):
+        m11 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
+        m12 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
+        m21 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
+        m22 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
