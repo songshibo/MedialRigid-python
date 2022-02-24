@@ -591,22 +591,24 @@ def advance_medial_sphere(m: ti.template(), v: ti.template(), t: ti.f32):
 
 @ti.func
 def find_cloeset_t(P1, P2, P3, Sr):
-    # S = (P1 t^2 + P2 t + P3)^{1/2} - Sr
+    # S = (P1 t^2 + P2 t + P3)^{1/2} - Sr = 0
     C = P3 - Sr*Sr
-    t = -1.0
-    # Both spheres are contact each other
-    valid = not (P1 == 0.0 and P2 == 0.0 and C == 0.0)
-    if not valid:
-        has_solution, t1, t2 = solve_quadratic(P1, P2, C)
-        if has_solution:
-            t = ts.clamp(min(t1, t2))
-        else:
-            d1 = ti.sqrt(P1 + P2 + P3) - Sr
-            if (ti.sqrt(P3) - Sr) < d1:
-                t = 0.0
-            else:
-                t = 1.0
-    return valid
+    t = 1.0
+    # if (P1 == 0.0 and C == 0.0): # if p1 = 0 p2 should = 0
+    #     t = 1.0 # keeps contact, so return 1
+    # else:
+    # P1 != 0
+    delta = P2 * P2 - 4.0 * P1 * C
+    if delta <= 0.0:
+        symmetric = -P2 / (2.0 * P1)
+        if 0.0 <= symmetric <= 1.0:
+            t = symmetric
+        elif symmetric < 0.0:
+            t = 0.0
+        # else t = 1.0
+    else:
+        t = ts.clamp((-P2 - ti.sqrt(delta)) / (2 * P1), 0.0, 1.0)
+    return t, delta
 
 
 @ti.func
@@ -680,20 +682,19 @@ def get_cone_cone_toi(m11: ti.template(), m12: ti.template(), m21: ti.template()
         # finding cloesest moment of sphere x,y
         # squared distance between 2 spheres
         # S = Sc^(1/2) - Sr = (P1 t^2 + P2 t + P3)^(1/2) - Sr, S=0 means contact
-        P1 = A1*x*x+B1*y*y+D1*x*y+E1*x+F1*y+C
+        P1 = A1*x*x + B1*y*y + D1*x*y + E1*x + F1*y+C
         P2 = A2 * x * x + B2 * y * y + D2 * x * \
             y + (E2 + G1) * x + (F2 + H1) * y + I
         P3 = D3 * x * y + G2 * x + H2 * y + J + A3 * x * x + B3 * y * y
         Sr = R1 * x + R2 * y + R3
 
-        if dis == 0.0:
-            break
+        t_local, delta = find_cloeset_t(P1, P2, P3-Sr**2)
+        if abs(t - t_local) < 1e-3:
+            if delta <= 0.0:
+                t = 1.0
+                break
 
-        # dS/dt = 2((P1 t^2 + P2 t + P3)^(1/2) - Sr) * (2P1 t + P2)/[2*(P1 t^2 + P2 t + P3)^(1/2)]
-        if P1 == 0.0 and P2 == 0.0 and (P3 - Sr**2) == 0.0:
-            break  # keeps contacting, ignore
-
-        has_solution, t1, t2 = solve_quadratic(P1, P2, P3-Sr**2)
+        t = t_local  # next iteration
 
     return t, x, y
 
