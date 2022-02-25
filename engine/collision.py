@@ -71,11 +71,10 @@ def solve_quadratic(A, B, C):
             root2 = (-B + ti.sqrt(delta)) / (2 * A)
     return has_solution, root1, root2
 
+
 #######################################
 ## Finding Neareset Sphere Algorithm ##
 #######################################
-
-
 @ti.func
 def get_sphere_cone_nearest(m: ti.template(),  m1: ti.template(), m2: ti.template()):
     cm = ti.Vector([m.x, m.y, m.z])
@@ -109,18 +108,18 @@ def get_sphere_cone_nearest(m: ti.template(),  m1: ti.template(), m2: ti.templat
 
 @ti.func
 def get_sphere_slab_nearest(m: ti.template(), m1: ti.template(), m2: ti.template(), m3: ti.template()):
-    cm = ti.Vector([m.x, m.y, m.z])
-    c1 = ti.Vector([m1.x, m1.y, m1.z])
-    c2 = ti.Vector([m2.x, m2.y, m2.z])
-    c3 = ti.Vector([m3.x, m3.y, m3.z])
-    r1, r2, r3 = m1.w, m2.w, m3.w
+    # cm = ti.Vector([m.x, m.y, m.z])
+    # c1 = ti.Vector([m1.x, m1.y, m1.z])
+    # c2 = ti.Vector([m2.x, m2.y, m2.z])
+    # c3 = ti.Vector([m3.x, m3.y, m3.z])
+    # r1, r2, r3 = m1.w, m2.w, m3.w
 
-    c31 = c1-c3
-    c32 = c2-c3
-    cm3 = c3-cm
+    c31 = ti.Vector([m1.x-m3.x, m1.y-m3.y, m1.z-m3.z])  # c1-c3
+    c32 = ti.Vector([m2.x-m3.x, m2.y-m3.y, m2.z-m3.z])  # c2-c3
+    cm3 = ti.Vector([m3.x-m.x, m3.y-m.y, m3.z-m.z])  # c3-cm
 
-    R1 = r1-r3
-    R2 = r2-r3
+    R1 = m1.w-m3.w
+    R2 = m2.w-m3.w
     A = ts.dot(c31, c31)
     B = 2.0 * ts.dot(c31, c32)
     C = ts.dot(c32, c32)
@@ -584,6 +583,9 @@ def detect_cone_slab(m11: ti.template(), m12: ti.template(), m21: ti.template(),
     return detect_cone_slab_param(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10)
 
 
+#################################
+## Finding First-TOI Algorithm ##
+#################################
 @ti.func
 def advance_medial_sphere(m: ti.template(), v: ti.template(), t: ti.f32):
     return ti.Vector([m.x + v.x*t, m.y + v.y*t, m.z + v.z*t, m.w])
@@ -613,18 +615,18 @@ def find_cloeset_t(P1, P2, P3, Sr):
 
 @ti.func
 def get_cone_cone_toi(m11: ti.template(), m12: ti.template(), m21: ti.template(), m22: ti.template(), v11: ti.template(), v12: ti.template(), v21: ti.template(), v22: ti.template()):
-    c11 = ti.Vector([m11.x, m11.y, m11.z])
-    c12 = ti.Vector([m12.x, m12.y, m12.z])
-    c21 = ti.Vector([m21.x, m21.y, m21.z])
-    c22 = ti.Vector([m22.x, m22.y, m22.z])
-    r11, r12, r21, r22 = m11.w, m12.w, m21.w, m22.w
+    # c11 = ti.Vector([m11.x, m11.y, m11.z])
+    # c12 = ti.Vector([m12.x, m12.y, m12.z])
+    # c21 = ti.Vector([m21.x, m21.y, m21.z])
+    # c22 = ti.Vector([m22.x, m22.y, m22.z])
+    # r11, r12, r21, r22 = m11.w, m12.w, m21.w, m22.w
 
-    c12c11 = c11-c12
-    c22c21 = c21-c22
-    c22c12 = c12-c22
-    v12v11 = v11-v12
-    v22v21 = v21-v22
-    v22v12 = v12-v22
+    c12c11 = ti.Vector([m11.x-m12.x, m11.y-m12.y, m11.z-m12.z])  # c11-c12
+    c22c21 = ti.Vector([m21.x-m22.x, m21.y-m22.y, m21.z-m22.z])  # c21-c22
+    c22c12 = ti.Vector([m12.x-m22.x, m12.y-m22.y, m12.z-m22.z])  # c12-c22
+    v12v11 = ti.Vector([v11.x-v12.x, v11.y-v12.y, v11.z-v12.z])  # v11-v12
+    v22v21 = ti.Vector([v21.x-v22.x, v21.y-v22.y, v21.z-v22.z])  # v21-v22
+    v22v12 = ti.Vector([v12.x-v22.x, v12.y-v22.y, v12.z-v22.z])  # v12-v22
 
     # t is time, x,y are the linear interpolation parameters
     # ci = c12+v12*t + (c11-c12+v11*t-v12*t) * x = c12+v12*t + (c12c11+v12v11*t) * x
@@ -662,7 +664,7 @@ def get_cone_cone_toi(m11: ti.template(), m12: ti.template(), m21: ti.template()
 
     # Sr = (r11-r12)*x + (r21-r22)*y + r12+r22
     #    = R1 * x + R2 * y + R3
-    R1, R2, R3 = r11-r12, r21-r22, r12+r22
+    R1, R2, R3 = m11.w-m12.w, m21.w-m22.w, m12.w+m22.w
 
     # time interval [t0,t1] (mapping to [0,1])
     t = ti.cast(1.0, ti.f32)  # start with initial value as t1
@@ -693,7 +695,8 @@ def get_cone_cone_toi(m11: ti.template(), m12: ti.template(), m21: ti.template()
                 t = 1.0
                 break
 
-        print("dis:{}, x:{}, y:{}".format(dis, x, y))
+        # print("dis:{}, x:{}, y:{}, t_local:{}".format(dis, x, y, t_local))
+        # print("P1:{},P2:{},P3:{},Sr:{}".format(P1, P2, P3, Sr))
 
         t = t_local  # next iteration
         iter_num += 1
@@ -704,7 +707,9 @@ def get_cone_cone_toi(m11: ti.template(), m12: ti.template(), m21: ti.template()
     return t, x, y
 
 
-# for unit test
+#####################
+## Unit Test Class ##
+#####################
 @ti.data_oriented
 class UnitTest:
     def __init__(self):
@@ -837,18 +842,23 @@ class UnitTest:
         m12 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
         m21 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
         m22 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
-        _v11 = ti.Vector([v11[0], v11[1], v11[2]])
-        _v12 = ti.Vector([v12[0], v12[1], v12[2]])
-        _v21 = ti.Vector([v21[0], v21[1], v21[2]])
-        _v22 = ti.Vector([v22[0], v22[1], v22[2]])
+        t = 0.0
+        if detect_cone_cone(m11, m12, m21, m22):
+            print("Should start in an intersection free state!!!")
+        else:
+            _v11 = ti.Vector([v11[0], v11[1], v11[2]])
+            _v12 = ti.Vector([v12[0], v12[1], v12[2]])
+            _v21 = ti.Vector([v21[0], v21[1], v21[2]])
+            _v22 = ti.Vector([v22[0], v22[1], v22[2]])
 
-        t, x, y = get_cone_cone_toi(m11, m12, m21, m22, _v11, _v12, _v21, _v22)
-        m1r = linear_lerp(advance_medial_sphere(m11, _v11, t),
-                          advance_medial_sphere(m12, _v12, t), x)
-        m2r = linear_lerp(advance_medial_sphere(m21, _v21, t),
-                          advance_medial_sphere(m22, _v22, t), y)
-        print("TOI:{}, x:{}, y:{}".format(t, x, y))
-        print("Surace Distance:{}".format(surface_distane(m1r, m2r)))
+            t, x, y = get_cone_cone_toi(
+                m11, m12, m21, m22, _v11, _v12, _v21, _v22)
+            m1r = linear_lerp(advance_medial_sphere(m11, _v11, t),
+                              advance_medial_sphere(m12, _v12, t), x)
+            m2r = linear_lerp(advance_medial_sphere(m21, _v21, t),
+                              advance_medial_sphere(m22, _v22, t), y)
+            print("TOI:{}, x:{}, y:{}".format(t, x, y))
+            print("Surace Distance:{}".format(surface_distane(m1r, m2r)))
         return t
 
     @ti.kernel
