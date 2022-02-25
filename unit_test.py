@@ -7,7 +7,7 @@ from util import *
 from engine import *
 import taichi as ti
 
-ti.init(arch=ti.gpu, debug=True)
+ti.init(arch=ti.gpu, debug=True, kernel_profiler=True)
 
 
 def surface_distance(m1, m2):
@@ -36,6 +36,15 @@ def generate_edge(name, m1, m2):
     ps.register_curve_network(name, v, e)
 
 
+def generate_edge_with_v(name, m1, m2, v1, v2):
+    v = np.array([m1[:3], m2[:3]])
+    e = np.array([[0, 1]])
+    curve = ps.register_curve_network(name, v, e)
+    vecs_node = np.array([v1, v2])
+    curve.add_vector_quantity(
+        "v-edge", vecs_node, enabled=True, length=1.0, radius=0.02)
+
+
 def generate_triangle(name, m1, m2, m3):
     v = np.array([m1[:3], m2[:3], m3[:3]])
     e = np.array([[0, 1], [1, 2], [2, 0]])
@@ -53,15 +62,15 @@ def update_curve_network():
     global unit_test_selected
     if unit_test_selected == "Sphere-Cone":
         ps.remove_curve_network("p1", error_if_absent=False)
-        generate_edge("p2", m21, m22)
+        generate_edge_with_v("p2", m21, m22, v11, v12)
     elif unit_test_selected == "Sphere-Slab":
         ps.remove_curve_network("p1", error_if_absent=False)
         generate_triangle("p2", m21, m22, m23)
     elif unit_test_selected == "Cone-Cone":
-        generate_edge("p1", m11, m12)
-        generate_edge("p2", m21, m22)
+        generate_edge_with_v("p1", m11, m12, v11, v12)
+        generate_edge_with_v("p2", m21, m22, v21, v22)
     elif unit_test_selected == "Cone-Slab":
-        generate_edge("p1", m11, m12)
+        generate_edge_with_v("p1", m11, m12, v11, v12)
         generate_triangle("p2", m21, m22, m23)
 
 
@@ -74,12 +83,16 @@ def decom_transform(m):
 
 
 # first
-m11 = np.array([0.0, 0.5, 0.5, 0.3])
+m11 = np.array([0.0, 0.7, 0.5, 0.3])
+v11 = np.array([0.0, -1, 0.0]).astype(np.float32)
 m12 = np.array([0.0, 1.0, 0.0, 0.45])
+v12 = np.array([0.0, -0.3, 0.6]).astype(np.float32)
 # m13 = np.array([0.0, 0.0, 0.0, 1.0])
 # second
 m21 = np.array([0.5, 0.0, 0.0, 0.35])
+v21 = np.array([0.0, 0.0, 0.0]).astype(np.float32)
 m22 = np.array([-0.5, 0.0, 0.0, 0.5])
+v22 = np.array([0.0, 0.0, 0.0]).astype(np.float32)
 m23 = np.array([0.0, 0.0, -0.6, 0.2])
 
 color1 = np.array([235.0, 64.0, 52.0, 255.0]) / 255.0
@@ -93,14 +106,14 @@ sp21 = register_sphere("m21", m21, vs, fs, color2, True)
 sp22 = register_sphere("m22", m22, vs, fs, color2, True)
 sp23 = register_sphere("m23", m23, vs, fs, color2, False)
 # second medial primitive lines
-generate_edge("p2", m21, m22)
+generate_edge_with_v("p2", m21, m22, v21, v22)
 
 u_ins = UnitTest()
 steps = 5000
 
 
 def callback():
-    global m11, m12, m13, m21, m22, m23, unit_test_selected, steps
+    global m11, m12, m13, m21, m22, m23, v11, v12, v21, v22, unit_test_selected, steps
 
     if psimgui.Button("Update from Scene"):
         m11 = decom_transform(ps.get_surface_mesh(
@@ -255,6 +268,44 @@ def callback():
         else:
             pass
         print("[Medial-Rigid] Searched minimum distance:{}".format(u_ins.min_dis[None]))
+
+    psimgui.Separator()
+    changed, v11 = psimgui.InputFloat3("V11", v11)
+    if changed:
+        generate_edge_with_v("p1", m11, m12, v11, v12)
+    changed, v12 = psimgui.InputFloat3("V12", v12)
+    if changed:
+        generate_edge_with_v("p1", m11, m12, v11, v12)
+    changed, v21 = psimgui.InputFloat3("V21", v21)
+    if changed:
+        generate_edge_with_v("p2", m21, m22, v21, v22)
+    changed, v22 = psimgui.InputFloat3("V22", v22)
+    if changed:
+        generate_edge_with_v("p2", m21, m22, v21, v22)
+
+    v11 = np.array(v11).astype(np.float32)
+    v12 = np.array(v12).astype(np.float32)
+    v21 = np.array(v21).astype(np.float32)
+    v22 = np.array(v22).astype(np.float32)
+    if psimgui.Button("Find TOI"):
+        toi = u_ins.moving_cone_cone(
+            m11, m12, m21, m22, v11, v12, v21, v22)
+        m11[:3] += v11 * toi
+        m12[:3] += v12 * toi
+        m21[:3] += v21 * toi
+        m22[:3] += v22 * toi
+        TS(sp11, m11[:3], m11[3])
+        TS(sp12, m12[:3], m12[3])
+        TS(sp21, m21[:3], m21[3])
+        TS(sp22, m22[:3], m22[3])
+        generate_edge("p1", m11, m12)
+        generate_edge("p2", m21, m22)
+    psimgui.SameLine()
+    if psimgui.Button("Performance of TOI"):
+        u_ins.cone_cone_performance(
+            m11, m12, m21, m22, v11, v12, v21, v22, steps)
+        ti.print_kernel_profile_info('trace')
+        ti.clear_kernel_profile_info()
 
 
 ps.init()

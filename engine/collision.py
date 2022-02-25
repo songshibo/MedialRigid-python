@@ -81,7 +81,7 @@ def get_sphere_cone_nearest(m: ti.template(),  m1: ti.template(), m2: ti.templat
     cm = ti.Vector([m.x, m.y, m.z])
     c1 = ti.Vector([m1.x, m1.y, m1.z])
     c2 = ti.Vector([m2.x, m2.y, m2.z])
-    r1, r2 = ti.static(m1.w, m2.w)
+    r1, r2 = m1.w, m2.w
     inversed = False
     if r1 > r2:
         c1, c2 = c2, c1
@@ -113,7 +113,7 @@ def get_sphere_slab_nearest(m: ti.template(), m1: ti.template(), m2: ti.template
     c1 = ti.Vector([m1.x, m1.y, m1.z])
     c2 = ti.Vector([m2.x, m2.y, m2.z])
     c3 = ti.Vector([m3.x, m3.y, m3.z])
-    r1, r2, r3 = ti.static(m1.w, m2.w, m3.w)
+    r1, r2, r3 = m1.w, m2.w, m3.w
 
     c31 = c1-c3
     c32 = c2-c3
@@ -231,7 +231,7 @@ def get_cone_cone_nearest(m11: ti.template(), m12: ti.template(), m21: ti.templa
     c12 = ti.Vector([m12.x, m12.y, m12.z])
     c21 = ti.Vector([m21.x, m21.y, m21.z])
     c22 = ti.Vector([m22.x, m22.y, m22.z])
-    r11, r12, r21, r22 = ti.static(m11.w, m12.w, m21.w, m22.w)
+    r11, r12, r21, r22 = m11.w, m12.w, m21.w, m22.w
 
     inversed1, inversed2 = False, False
     if r11 > r12:
@@ -543,7 +543,7 @@ def detect_cone_slab_param(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10):
 
 @ti.func
 def detect_cone_cone(m11: ti.template(), m12: ti.template(), m21: ti.template(), m22: ti.template()):
-    r11, r12, r21, r22 = ti.static(m11.w, m12.w, m21.w, m22.w)
+    r11, r12, r21, r22 = m11.w, m12.w, m21.w, m22.w
 
     c12c11 = ti.Vector([m11.x-m12.x, m11.y-m12.y, m11.z-m12.z])
     c22c21 = ti.Vector([m21.x-m22.x, m21.y-m22.y, m21.z-m22.z])
@@ -564,7 +564,7 @@ def detect_cone_cone(m11: ti.template(), m12: ti.template(), m21: ti.template(),
 
 @ti.func
 def detect_cone_slab(m11: ti.template(), m12: ti.template(), m21: ti.template(), m22: ti.template(), m23: ti.template()):
-    r11, r12, r21, r22, r23 = ti.static(m11.w, m12.w, m21.w, m22.w, m23.w)
+    r11, r12, r21, r22, r23 = m11.w, m12.w, m21.w, m22.w, m23.w
     c12c11 = ti.Vector([m11.x-m12.x, m11.y-m12.y, m11.z-m12.z])
     c23c21 = ti.Vector([m21.x-m23.x, m21.y-m23.y, m21.z-m23.z])
     c23c22 = ti.Vector([m22.x-m23.x, m22.y-m23.y, m22.z-m23.z])
@@ -617,7 +617,7 @@ def get_cone_cone_toi(m11: ti.template(), m12: ti.template(), m21: ti.template()
     c12 = ti.Vector([m12.x, m12.y, m12.z])
     c21 = ti.Vector([m21.x, m21.y, m21.z])
     c22 = ti.Vector([m22.x, m22.y, m22.z])
-    r11, r12, r21, r22 = ti.static(m11.w, m12.w, m21.w, m22.w)
+    r11, r12, r21, r22 = m11.w, m12.w, m21.w, m22.w
 
     c12c11 = c11-c12
     c22c21 = c21-c22
@@ -665,11 +665,10 @@ def get_cone_cone_toi(m11: ti.template(), m12: ti.template(), m21: ti.template()
     R1, R2, R3 = r11-r12, r21-r22, r12+r22
 
     # time interval [t0,t1] (mapping to [0,1])
-    t = 1.0  # start with initial value as t1
-    iter_num = 0  # keep tracking iteration numbers
+    t = ti.cast(1.0, ti.f32)  # start with initial value as t1
     x, y = -1.0, -1.0
-    while (iter_num < 20):
-        iter_num += 1
+    iter_num = 0
+    while iter_num < 10:  # iteration number is static
         m11t = advance_medial_sphere(m11, v11, t)
         m12t = advance_medial_sphere(m12, v12, t)
         m21t = advance_medial_sphere(m21, v21, t)
@@ -688,14 +687,20 @@ def get_cone_cone_toi(m11: ti.template(), m12: ti.template(), m21: ti.template()
         P3 = D3 * x * y + G2 * x + H2 * y + J + A3 * x * x + B3 * y * y
         Sr = R1 * x + R2 * y + R3
 
-        t_local, delta = find_cloeset_t(P1, P2, P3-Sr**2)
-        if abs(t - t_local) < 1e-3:
+        t_local, delta = find_cloeset_t(P1, P2, P3, Sr)
+        if abs(t - t_local) < 1e-5:
             if delta <= 0.0:
                 t = 1.0
                 break
 
-        t = t_local  # next iteration
+        print("dis:{}, x:{}, y:{}".format(dis, x, y))
 
+        t = t_local  # next iteration
+        iter_num += 1
+
+    # print("Iteration Num:{}".format(iter_num))
+    if t == 0.0:
+        t = 1.0
     return t, x, y
 
 
@@ -783,7 +788,7 @@ class UnitTest:
         ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
         ti_m4 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
         self.min_dis[None] = 1000000.0
-        real_steps = max(steps, 31620)
+        real_steps = min(steps, 31620)
         for i, j in ti.ndrange(real_steps, real_steps):
             t1, t2 = i / ti.cast(real_steps, ti.f32), j / \
                 ti.cast(real_steps, ti.f32)
@@ -799,7 +804,7 @@ class UnitTest:
         ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
         ti_m4 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
         self.min_dis[None] = 1000000.0
-        real_steps = max(steps, 31620)
+        real_steps = min(steps, 31620)
         for i, j in ti.ndrange(real_steps, real_steps):
             t1, t2 = i / ti.cast(real_steps, ti.f32), j / \
                 ti.cast(real_steps, ti.f32)
@@ -816,7 +821,7 @@ class UnitTest:
         ti_m4 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
         ti_m5 = ti.Vector([m5[0], m5[1], m5[2], m5[3]])
         self.min_dis[None] = 1000000.0
-        real_steps = max(steps, 1000)
+        real_steps = min(steps, 1000)
         for i, j, k in ti.ndrange(real_steps, real_steps, real_steps):
             t1, t2, t3 = i / ti.cast(real_steps, ti.f32), j / \
                 ti.cast(real_steps, ti.f32), k / ti.cast(real_steps, ti.f32)
@@ -827,8 +832,36 @@ class UnitTest:
                 ti.atomic_min(self.min_dis[None], dis)
 
     @ti.kernel
-    def moving_cone_cone(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr(), v11: ti.any_arr(), v12: ti.any_arr(), v21: ti.any_arr(), v22: ti.any_arr(), steps: ti.i32):
+    def moving_cone_cone(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr(), v11: ti.any_arr(), v12: ti.any_arr(), v21: ti.any_arr(), v22: ti.any_arr()) -> ti.f32:
         m11 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
         m12 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
         m21 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
         m22 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
+        _v11 = ti.Vector([v11[0], v11[1], v11[2]])
+        _v12 = ti.Vector([v12[0], v12[1], v12[2]])
+        _v21 = ti.Vector([v21[0], v21[1], v21[2]])
+        _v22 = ti.Vector([v22[0], v22[1], v22[2]])
+
+        t, x, y = get_cone_cone_toi(m11, m12, m21, m22, _v11, _v12, _v21, _v22)
+        m1r = linear_lerp(advance_medial_sphere(m11, _v11, t),
+                          advance_medial_sphere(m12, _v12, t), x)
+        m2r = linear_lerp(advance_medial_sphere(m21, _v21, t),
+                          advance_medial_sphere(m22, _v22, t), y)
+        print("TOI:{}, x:{}, y:{}".format(t, x, y))
+        print("Surace Distance:{}".format(surface_distane(m1r, m2r)))
+        return t
+
+    @ti.kernel
+    def cone_cone_performance(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr(), v11: ti.any_arr(), v12: ti.any_arr(), v21: ti.any_arr(), v22: ti.any_arr(), steps: ti.int32):
+        m11 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
+        m12 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
+        m21 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
+        m22 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
+        _v11 = ti.Vector([v11[0], v11[1], v11[2]])
+        _v12 = ti.Vector([v12[0], v12[1], v12[2]])
+        _v21 = ti.Vector([v21[0], v21[1], v21[2]])
+        _v22 = ti.Vector([v22[0], v22[1], v22[2]])
+
+        for i in range(steps):
+            t, x, y = get_cone_cone_toi(
+                m11, m12, m21, m22, _v11, _v12, _v21, _v22)
