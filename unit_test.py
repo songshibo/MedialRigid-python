@@ -96,7 +96,7 @@ def decom_transform(m):
 m11 = np.array([0.0, 0.7, 0.5, 0.3])
 v11 = np.array([0.0, -1, 0.0]).astype(np.float32)
 m12 = np.array([0.0, 1.0, 0.0, 0.45])
-v12 = np.array([0.0, -0.3, 0.6]).astype(np.float32)
+v12 = np.array([0.0, -0.5, 0.3]).astype(np.float32)
 # m13 = np.array([0.0, 0.0, 0.0, 1.0])
 # second
 m21 = np.array([0.5, 0.0, 0.0, 0.35])
@@ -338,6 +338,19 @@ def callback():
             TS(sp21, m21[:3], m21[3])
             TS(sp22, m22[:3], m22[3])
             TS(sp23, m23[:3], m23[3])
+        elif unit_test_selected == "Cone-Slab":
+            toi = u_ins.moving_cone_slab(
+                m11, m12, m21, m22, m23, v11, v12, v21, v22, v23)
+            m11[:3] += v11 * toi
+            m12[:3] += v12 * toi
+            m21[:3] += v21 * toi
+            m22[:3] += v22 * toi
+            m23[:3] += v23 * toi
+            TS(sp11, m11[:3], m11[3])
+            TS(sp12, m12[:3], m12[3])
+            TS(sp21, m21[:3], m21[3])
+            TS(sp22, m22[:3], m22[3])
+            TS(sp23, m23[:3], m23[3])
 
     psimgui.SameLine()
     if psimgui.Button("Performance of TOI"):
@@ -345,7 +358,7 @@ def callback():
             m11, m12, m21, m22, v11, v12, v21, v22, steps)
         ti.print_kernel_profile_info('trace')
         ti.clear_kernel_profile_info()
-    
+
     _, global_t = psimgui.InputFloat("advanced t", global_t)
     if psimgui.Button("Advance"):
         m11[:3] += v11 * global_t

@@ -760,7 +760,6 @@ def get_sphere_slab_toi(m: ti.template(), m1: ti.template(), m2: ti.template(), 
         m2t = advance_medial_sphere(m2, v2, t)
         m3t = advance_medial_sphere(m3, v3, t)
         # finding neareset sphere at t
-
         x, y = get_sphere_slab_nearest(mt, m1t, m2t, m3t)
 
         x2, y2, xy = x*x, y*y, x*y
@@ -787,6 +786,95 @@ def get_sphere_slab_toi(m: ti.template(), m1: ti.template(), m2: ti.template(), 
     if t == 0.0:
         t = 1.0
     return t, x, y
+
+
+@ti.func
+def get_cone_slab_toi(m11: ti.template(), m12: ti.template(), m21: ti.template(), m22: ti.template(), m23: ti.template(), v11: ti.template(), v12: ti.template(), v21: ti.template(), v22: ti.template(), v23: ti.template()):
+    c11c12 = ti.Vector([m11.x-m12.x, m11.y-m12.y, m11.z-m12.z])
+    c21c23 = ti.Vector([m21.x-m23.x, m21.y-m23.y, m21.z-m23.z])
+    c22c23 = ti.Vector([m22.x-m23.x, m22.y-m23.y, m22.z-m23.z])
+    c12c23 = ti.Vector([m12.x-m23.x, m12.y-m23.y, m12.z-m23.z])
+
+    v11v12 = v11-v12
+    v21v23 = v21-v23
+    v22v23 = v22-v23
+    v12v23 = v12-v23
+
+    # x^2
+    A1, A2, A3 = ts.sqrLength(v11v12), 2.0 * \
+        ts.dot(v11v12, c11c12), ts.sqrLength(c11c12)
+    # y^2
+    B1, B2, B3 = ts.sqrLength(v21v23), 2.0 * \
+        ts.dot(v21v23, c21c23), ts.sqrLength(c21c23)
+    # z^2
+    C1, C2, C3 = ts.sqrLength(v22v23), 2.0 * \
+        ts.dot(v22v23, c22c23), ts.sqrLength(c22c23)
+    # xy
+    D1 = -2.0 * ts.dot(v11v12, v21v23)
+    D2 = -2.0 * (ts.dot(v11v12, c21c23) + ts.dot(c11c12, v21v23))
+    D3 = -2.0 * ts.dot(c11c12, c21c23)
+    # xz
+    E1 = -2.0 * ts.dot(v11v12, v22v23)
+    E2 = -2.0 * (ts.dot(v11v12, c22c23) + ts.dot(c11c12, v22v23))
+    E3 = -2.0 * ts.dot(c11c12, c22c23)
+    # yz
+    F1 = 2.0 * ts.dot(v21v23, v22v23)
+    F2 = 2.0 * (ts.dot(v21v23, c22c23) + ts.dot(c21c23, v22v23))
+    F3 = 2.0 * ts.dot(c21c23, c22c23)
+    # x
+    G1 = 2.0 * ts.dot(v11v12, v12v23)
+    G2 = 2.0 * (ts.dot(v11v12, c12c23) + ts.dot(c11c12, v12v23))
+    G3 = 2.0 * ts.dot(c11c12, c12c23)
+    # y
+    H1 = -2.0 * ts.dot(v21v23, v12v23)
+    H2 = -2.0 * (ts.dot(v21v23, c12c23) + ts.dot(c21c23, v12v23))
+    H3 = -2.0 * ts.dot(c21c23, c12c23)
+    # z
+    I1 = -2.0 * ts.dot(v22v23, v12v23)
+    I2 = -2.0 * (ts.dot(v22v23, c12c23) + ts.dot(v12v23, c22c23))
+    I3 = -2.0 * ts.dot(c22c23, c12c23)
+    # t
+    J1, J2, J3 = ts.sqrLength(v12v23), 2.0 * \
+        ts.dot(v12v23, c12c23), ts.sqrLength(c12c23)
+
+    R1, R2, R3, R4 = m11.w-m12.w, m21.w-m23.w, m22.w-m23.w, m12.w+m23.w
+
+    t = 1.0
+    x, y, z = -1.0, -1.0, -1.0
+    iter_num = 0
+    while iter_num < 15:
+        m11t = advance_medial_sphere(m11, v11, t)
+        m12t = advance_medial_sphere(m12, v12, t)
+        m21t = advance_medial_sphere(m21, v21, t)
+        m22t = advance_medial_sphere(m22, v22, t)
+        m23t = advance_medial_sphere(m23, v23, t)
+
+        x, y, z = get_cone_slab_nearest(m11t, m12t, m21t, m22t, m23t)
+
+        x2, y2, z2, xy, xz, yz = x*x, y*y, z*z, x*y, x*z, y*z
+        P1 = A1*x2+B1*y2+C1*z2+D1*xy+E1*xz+F1*yz+G1*x+H1*y+I1*z+J1
+        P2 = A2*x2+B2*y2+C2*z2+D2*xy+E2*xz+F2*yz+G2*x+H2*y+I2*z+J2
+        P3 = A3*x2+B3*y2+C3*z2+D3*xy+E3*xz+F3*yz+G3*x+H3+y+I3*z+J3
+        Sr = R1*x+R2*y+R3*z+R4
+
+        t_local, delta = find_cloeset_t(P1, P2, P3, Sr)
+
+        dis = surface_distane(linear_lerp(m11t, m12t, x),
+                              bary_lerp(m21t, m22t, m23t, y, z))
+        print("dis:{}, x:{}, y:{}, z:{}, t_local:{}".format(dis, x, y, z, t_local))
+        # print("P1:{},P2:{},P3:{},Sr:{} \n".format(P1, P2, P3, Sr))
+        if abs(t - t_local) < 1e-5:
+            if delta <= 0.0:
+                t = 1.0
+                break
+
+        t = t_local  # next iteration
+        iter_num += 1
+
+    print("Iterations:{}".format(iter_num))
+    if t == 0.0:
+        t = 1.0
+    return t, x, y, z
 
 
 #####################
@@ -965,6 +1053,33 @@ class UnitTest:
             mst = bary_lerp(advance_medial_sphere(ti_m1, _v1, t), advance_medial_sphere(
                 ti_m2, _v2, t), advance_medial_sphere(ti_m3, _v3, t), x, y)
             print("Surace Distance:{}".format(surface_distane(mt, mst)))
+        return t
+
+    @ti.kernel
+    def moving_cone_slab(self, m11: ti.any_arr(), m12: ti.any_arr(), m21: ti.any_arr(), m22: ti.any_arr(), m23: ti.any_arr(), v11: ti.any_arr(), v12: ti.any_arr(), v21: ti.any_arr(), v22: ti.any_arr(), v23: ti.any_arr()) -> ti.f32:
+        m11t = ti.Vector([m11[0], m11[1], m11[2], m11[3]])
+        m12t = ti.Vector([m12[0], m12[1], m12[2], m12[3]])
+        m21t = ti.Vector([m21[0], m21[1], m21[2], m21[3]])
+        m22t = ti.Vector([m22[0], m22[1], m22[2], m22[3]])
+        m23t = ti.Vector([m23[0], m23[1], m23[2], m23[3]])
+        t = 0.0
+        t1, t2, t3 = get_cone_slab_nearest(m11t, m12t, m21t, m22t, m23t)
+        if surface_distane(linear_lerp(m11t, m12t, t1), bary_lerp(m21t, m22t, m23t, t2, t3)) <= 0.0:
+            print("Should start in an intersection free state!!!")
+        else:
+            _v11 = ti.Vector([v11[0], v11[1], v11[2]])
+            _v12 = ti.Vector([v12[0], v12[1], v12[2]])
+            _v21 = ti.Vector([v21[0], v21[1], v21[2]])
+            _v22 = ti.Vector([v22[0], v22[1], v22[2]])
+            _v23 = ti.Vector([v23[0], v23[1], v23[2]])
+            t, x, y, z = get_cone_slab_toi(
+                m11t, m12t, m21t, m22t, m23t, _v11, _v12, _v21, _v22, _v23)
+            print("TOI:{}, x:{}, y:{}, z:{}".format(t, x, y, z))
+            mct = advance_medial_sphere(linear_lerp(
+                m11t, m12t, x), linear_lerp(_v11, _v12, x), t)
+            mst = advance_medial_sphere(
+                bary_lerp(m21t, m22t, m23t, y, z), bary_lerp(_v21, _v22, _v23, y, z), t)
+            print("Surace Distance:{}".format(surface_distane(mct, mst)))
         return t
 
     @ti.kernel
