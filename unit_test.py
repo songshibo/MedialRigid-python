@@ -52,6 +52,16 @@ def generate_triangle(name, m1, m2, m3):
     ps.register_curve_network(name, v, e)
 
 
+def generate_triangle_with_v(name, m1, m2, m3, v1, v2, v3):
+    v = np.array([m1[:3], m2[:3], m3[:3]])
+    e = np.array([[0, 1], [1, 2], [2, 0]])
+    ps.remove_curve_network(name, error_if_absent=False)
+    curve = ps.register_curve_network(name, v, e)
+    vecs_nodes = np.array([v1, v2, v3])
+    curve.add_vector_quantity("v-edge", vecs_nodes,
+                              enabled=True, length=1.0, radius=0.02)
+
+
 vs, fs = igl.read_triangle_mesh("./models/unit_sphere.obj")
 
 unit_test_options = ["Sphere-Cone", "Sphere-Slab", "Cone-Cone", "Cone-Slab"]
@@ -65,7 +75,7 @@ def update_curve_network():
         generate_edge_with_v("p2", m21, m22, v11, v12)
     elif unit_test_selected == "Sphere-Slab":
         ps.remove_curve_network("p1", error_if_absent=False)
-        generate_triangle("p2", m21, m22, m23)
+        generate_triangle_with_v("p2", m21, m22, m23, v21, v22, v23)
     elif unit_test_selected == "Cone-Cone":
         generate_edge_with_v("p1", m11, m12, v11, v12)
         generate_edge_with_v("p2", m21, m22, v21, v22)
@@ -94,6 +104,7 @@ v21 = np.array([0.0, 0.0, 0.0]).astype(np.float32)
 m22 = np.array([-0.5, 0.0, 0.0, 0.5])
 v22 = np.array([0.0, 0.0, 0.0]).astype(np.float32)
 m23 = np.array([0.0, 0.0, -0.6, 0.2])
+v23 = np.array([0.0, 0.0, 0.0])
 
 color1 = np.array([235.0, 64.0, 52.0, 255.0]) / 255.0
 color2 = np.array([52.0, 177.0, 235.0, 255.0]) / 255.0
@@ -110,10 +121,11 @@ generate_edge_with_v("p2", m21, m22, v21, v22)
 
 u_ins = UnitTest()
 steps = 5000
+global_t = 1.0
 
 
 def callback():
-    global m11, m12, m13, m21, m22, m23, v11, v12, v21, v22, unit_test_selected, steps
+    global m11, m12, m13, m21, m22, m23, v11, v12, v21, v22, v23, global_t, unit_test_selected, steps
 
     if psimgui.Button("Update from Scene"):
         m11 = decom_transform(ps.get_surface_mesh(
@@ -270,42 +282,80 @@ def callback():
         print("[Medial-Rigid] Searched minimum distance:{}".format(u_ins.min_dis[None]))
 
     psimgui.Separator()
-    changed, v11 = psimgui.InputFloat3("V11", v11)
-    if changed:
-        generate_edge_with_v("p1", m11, m12, v11, v12)
-    changed, v12 = psimgui.InputFloat3("V12", v12)
-    if changed:
-        generate_edge_with_v("p1", m11, m12, v11, v12)
-    changed, v21 = psimgui.InputFloat3("V21", v21)
-    if changed:
-        generate_edge_with_v("p2", m21, m22, v21, v22)
-    changed, v22 = psimgui.InputFloat3("V22", v22)
-    if changed:
-        generate_edge_with_v("p2", m21, m22, v21, v22)
+    if unit_test_selected == "Cone-Cone":
+        changed, v11 = psimgui.InputFloat3("V11", v11)
+        if changed:
+            generate_edge_with_v("p1", m11, m12, v11, v12)
+        changed, v12 = psimgui.InputFloat3("V12", v12)
+        if changed:
+            generate_edge_with_v("p1", m11, m12, v11, v12)
+        changed, v21 = psimgui.InputFloat3("V21", v21)
+        if changed:
+            generate_edge_with_v("p2", m21, m22, v21, v22)
+        changed, v22 = psimgui.InputFloat3("V22", v22)
+        if changed:
+            generate_edge_with_v("p2", m21, m22, v21, v22)
+    elif unit_test_selected == "Sphere-Slab":
+        _, v11 = psimgui.InputFloat3("V11", v11)
+
+        changed, v21 = psimgui.InputFloat3("V21", v21)
+        if changed:
+            generate_triangle_with_v("p2", m21, m22, m23, v21, v22, v23)
+        changed, v22 = psimgui.InputFloat3("V22", v22)
+        if changed:
+            generate_triangle_with_v("p2", m21, m22, m23, v21, v22, v23)
+        changed, v23 = psimgui.InputFloat3("V23", v23)
+        if changed:
+            generate_triangle_with_v("p2", m21, m22, m23, v21, v22, v23)
 
     v11 = np.array(v11).astype(np.float32)
     v12 = np.array(v12).astype(np.float32)
     v21 = np.array(v21).astype(np.float32)
     v22 = np.array(v22).astype(np.float32)
+    v23 = np.array(v23).astype(np.float32)
     if psimgui.Button("Find TOI"):
-        toi = u_ins.moving_cone_cone(
-            m11, m12, m21, m22, v11, v12, v21, v22)
-        m11[:3] += v11 * toi
-        m12[:3] += v12 * toi
-        m21[:3] += v21 * toi
-        m22[:3] += v22 * toi
-        TS(sp11, m11[:3], m11[3])
-        TS(sp12, m12[:3], m12[3])
-        TS(sp21, m21[:3], m21[3])
-        TS(sp22, m22[:3], m22[3])
-        generate_edge("p1", m11, m12)
-        generate_edge("p2", m21, m22)
+        if unit_test_selected == "Cone-Cone":
+            toi = u_ins.moving_cone_cone(
+                m11, m12, m21, m22, v11, v12, v21, v22)
+            m11[:3] += v11 * toi
+            m12[:3] += v12 * toi
+            m21[:3] += v21 * toi
+            m22[:3] += v22 * toi
+            TS(sp11, m11[:3], m11[3])
+            TS(sp12, m12[:3], m12[3])
+            TS(sp21, m21[:3], m21[3])
+            TS(sp22, m22[:3], m22[3])
+            generate_edge("p1", m11, m12)
+            generate_edge("p2", m21, m22)
+        elif unit_test_selected == "Sphere-Slab":
+            toi = u_ins.moving_sphere_slab(
+                m11, m21, m22, m23, v11, v21, v22, v23)
+            m11[:3] += v11 * toi
+            m21[:3] += v21 * toi
+            m22[:3] += v22 * toi
+            m23[:3] += v23 * toi
+            TS(sp11, m11[:3], m11[3])
+            TS(sp21, m21[:3], m21[3])
+            TS(sp22, m22[:3], m22[3])
+            TS(sp23, m23[:3], m23[3])
+
     psimgui.SameLine()
     if psimgui.Button("Performance of TOI"):
         u_ins.cone_cone_performance(
             m11, m12, m21, m22, v11, v12, v21, v22, steps)
         ti.print_kernel_profile_info('trace')
         ti.clear_kernel_profile_info()
+    
+    _, global_t = psimgui.InputFloat("advanced t", global_t)
+    if psimgui.Button("Advance"):
+        m11[:3] += v11 * global_t
+        m21[:3] += v21 * global_t
+        m22[:3] += v22 * global_t
+        m23[:3] += v23 * global_t
+        TS(sp11, m11[:3], m11[3])
+        TS(sp21, m21[:3], m21[3])
+        TS(sp22, m22[:3], m22[3])
+        TS(sp23, m23[:3], m23[3])
 
 
 ps.init()

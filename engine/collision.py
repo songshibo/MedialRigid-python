@@ -1,3 +1,4 @@
+from os import PRIO_USER
 import taichi as ti
 import taichi_glsl as ts
 
@@ -634,6 +635,7 @@ def get_cone_cone_toi(m11: ti.template(), m12: ti.template(), m21: ti.template()
     # Sc^2 = ||ci-cj||^2
     # = (A1t^2+A2t+A3)x^2 + (B1t^2+B2t+B3)y^2 + Ct^2 + (D1t^2+D2t+D3)xy + (E1t+E2)xt + (F1t+F2)yt + (G1t+G2)x + (H1t+H2)y + It + J
     # = (A1t^2+A2t+A3)x^2 + (B1t^2+B2t+B3)y^2 + (D1t^2+D2t+D3)xy + [E1t^2+(E2+G1)t+G2]x + [F1t^2+(F2+H1)t+H2]y + Ct^2 + It + J
+    # = (A1t^2+A2t+A3)x^2 + (B1t^2+B2t+B3)y^2 + (D1t^2+D2t+D3)xy + [E1t^2+E2t+E3]x + [F1t^2+F2t+F3]y + Ct^2 + It + J
 
     # x^2
     A1 = ts.sqrLength(v12v11)
@@ -649,14 +651,12 @@ def get_cone_cone_toi(m11: ti.template(), m12: ti.template(), m21: ti.template()
     D3 = -2.0 * ts.dot(c12c11, c22c21)
     # x
     E1 = 2.0 * ts.dot(v12v11, v22v12)
-    E2 = 2.0 * ts.dot(c12c11, v22v12)
-    G1 = 2.0 * ts.dot(c22c12, v12v11)
-    G2 = 2.0 * ts.dot(c12c11, c22c12)
+    E2 = 2.0 * ts.dot(c12c11, v22v12) + 2.0 * ts.dot(c22c12, v12v11)
+    E3 = 2.0 * ts.dot(c12c11, c22c12)
     # y
     F1 = -2.0 * ts.dot(v22v21, v22v12)
-    F2 = -2.0 * ts.dot(c22c21, v22v12)
-    H1 = -2.0 * ts.dot(c22c12, v22v21)
-    H2 = -2.0 * ts.dot(c22c21, c22c12)
+    F2 = -2.0 * ts.dot(c22c21, v22v12) - 2.0 * ts.dot(c22c12, v22v21)
+    F3 = -2.0 * ts.dot(c22c21, c22c12)
     # t
     C = ts.sqrLength(v22v12)
     I = 2.0 * ts.dot(v22v12, c22c12)
@@ -667,26 +667,28 @@ def get_cone_cone_toi(m11: ti.template(), m12: ti.template(), m21: ti.template()
     R1, R2, R3 = m11.w-m12.w, m21.w-m22.w, m12.w+m22.w
 
     # time interval [t0,t1] (mapping to [0,1])
-    t = ti.cast(1.0, ti.f32)  # start with initial value as t1
+    t = 1.0  # start with initial value as t1
     x, y = -1.0, -1.0
     iter_num = 0
-    while iter_num < 10:  # iteration number is static
+    while iter_num < 8:  # iteration number is static
         m11t = advance_medial_sphere(m11, v11, t)
         m12t = advance_medial_sphere(m12, v12, t)
         m21t = advance_medial_sphere(m21, v21, t)
         m22t = advance_medial_sphere(m22, v22, t)
         # finding neareset sphere at t
         x, y = get_cone_cone_nearest(m11t, m12t, m21t, m22t)
-        dis = surface_distane(linear_lerp(m11t, m12t, x),
-                              linear_lerp(m21t, m22t, y))
 
+        # P1 = ts.sqrLength(v1t-v2t)
+        # P2 = 2.0 * ts.dot(c1c2, v1t-v2t)
+        # P3 = ts.sqrLength(c1c2)
+        # Sr = m1t.w + m2t.w
         # finding cloesest moment of sphere x,y
         # squared distance between 2 spheres
         # S = Sc^(1/2) - Sr = (P1 t^2 + P2 t + P3)^(1/2) - Sr, S=0 means contact
-        P1 = A1*x*x + B1*y*y + D1*x*y + E1*x + F1*y+C
-        P2 = A2 * x * x + B2 * y * y + D2 * x * \
-            y + (E2 + G1) * x + (F2 + H1) * y + I
-        P3 = D3 * x * y + G2 * x + H2 * y + J + A3 * x * x + B3 * y * y
+        x2, y2, xy = x*x, y*y, x*y
+        P1 = A1*x2 + B1*y2 + D1*xy + E1*x + F1*y+C
+        P2 = A2 * x2 + B2 * y2 + D2 * xy + E2 * x + F2 * y + I
+        P3 = D3 * xy + E3 * x + F3 * y + J + A3 * x2 + B3 * y2
         Sr = R1 * x + R2 * y + R3
 
         t_local, delta = find_cloeset_t(P1, P2, P3, Sr)
@@ -695,6 +697,8 @@ def get_cone_cone_toi(m11: ti.template(), m12: ti.template(), m21: ti.template()
                 t = 1.0
                 break
 
+        # dis = surface_distane(linear_lerp(m11t, m12t, x),
+        #                       linear_lerp(m21t, m22t, y))
         # print("dis:{}, x:{}, y:{}, t_local:{}".format(dis, x, y, t_local))
         # print("P1:{},P2:{},P3:{},Sr:{}".format(P1, P2, P3, Sr))
 
@@ -702,6 +706,84 @@ def get_cone_cone_toi(m11: ti.template(), m12: ti.template(), m21: ti.template()
         iter_num += 1
 
     # print("Iteration Num:{}".format(iter_num))
+    if t == 0.0:
+        t = 1.0
+    return t, x, y
+
+
+@ti.func
+def get_sphere_slab_toi(m: ti.template(), m1: ti.template(), m2: ti.template(), m3: ti.template(), v: ti.template(), v1: ti.template(), v2: ti.template(), v3: ti.template()):
+    c3c2 = ti.Vector([m2.x - m3.x, m2.y - m3.y, m2.z - m3.z])
+    c3c1 = ti.Vector([m1.x - m3.x, m1.y - m3.y, m1.z - m3.z])
+    cc3 = ti.Vector([m3.x - m.x, m3.y - m.y, m3.z - m.z])
+    vv3 = v3 - v
+    v3v2 = v2 - v3
+    v3v1 = v1 - v3
+
+    # ci = c+vt, cj = [(v1-v3)t + c1-c3] x + [(v2-v3)t + c2-c3] y + c3+v3t
+    # Sc = ||cj - ci||^2
+    # = (A1t^2+A2t+A3)x^2 + (B1t^2+B2t+B3)y^2 + (D1t^2+D2t+D3)xy + [E1t^2+(E2+G1)t+G2]x + [F1t^2+(F2+H1)t+H2]y + Ct^2 + It + J
+    # x^2
+    A1 = ts.sqrLength(v3v1)
+    A2 = 2.0 * ts.dot(c3c1, v3v1)
+    A3 = ts.sqrLength(c3c1)
+    # y^2
+    B1 = ts.sqrLength(v3v2)
+    B2 = 2.0 * ts.dot(c3c2, v3v2)
+    B3 = ts.sqrLength(c3c2)
+    # xy
+    D1 = 2.0 * ts.dot(v3v2, v3v1)
+    D2 = 2.0 * (ts.dot(v3v2, c3c1) + ts.dot(v3v1, c3c2))
+    D3 = 2.0 * ts.dot(c3c2, c3c1)
+    # x
+    E1 = 2.0 * ts.dot(v3v1, vv3)
+    E2 = 2.0 * ts.dot(c3c1, vv3) + 2.0 * ts.dot(v3v1, cc3)
+    E3 = 2.0 * ts.dot(c3c1, cc3)
+    # y
+    F1 = 2.0 * ts.dot(v3v2, vv3)
+    F2 = 2.0 * ts.dot(c3c2, vv3) + 2.0 * ts.dot(v3v2, cc3)
+    F3 = 2.0 * ts.dot(c3c2, cc3)
+    # t^2 / t
+    C = ts.sqrLength(vv3)
+    I = 2.0 * ts.dot(vv3, cc3)
+    J = ts.sqrLength(cc3)
+
+    # Sr = r3 + r + (r1-r3) x + (r2-r3) y
+    R1, R2, R3 = m1.w - m3.w, m2.w-m3.w, m3.w + m.w
+
+    t = 1.0
+    x, y = -1.0, -1.0
+    iter_num = 0
+    while iter_num < 8:
+        mt = advance_medial_sphere(m, v, t)
+        m1t = advance_medial_sphere(m1, v1, t)
+        m2t = advance_medial_sphere(m2, v2, t)
+        m3t = advance_medial_sphere(m3, v3, t)
+        # finding neareset sphere at t
+
+        x, y = get_sphere_slab_nearest(mt, m1t, m2t, m3t)
+
+        x2, y2, xy = x*x, y*y, x*y
+        P1 = A1 * x2 + B1 * y2 + D1 * xy + E1 * x + F1 * y + C
+        P2 = A2 * x2 + B2 * y2 + D2 * xy + E2 * x + F2 * y + I
+        P3 = A3 * x2 + B3 * y2 + D3 * xy + E3 * x + F3 * y + J
+        Sr = R1 * x + R2 * y + R3
+
+        t_local, delta = find_cloeset_t(P1, P2, P3, Sr)
+
+        # print(bary_lerp(m1t, m2t, m3t, x, y))
+        # dis = surface_distane(mt, bary_lerp(m1t, m2t, m3t, x, y))
+        # print("dis:{}, x:{}, y:{}, t_local:{}".format(dis, x, y, t_local))
+        # print("P1:{},P2:{},P3:{},Sr:{} \n".format(P1, P2, P3, Sr))
+        if abs(t - t_local) < 1e-5:
+            if delta <= 0.0:
+                t = 1.0
+                break
+
+        t = t_local  # next iteration
+        iter_num += 1
+
+    print("Iterations:{}".format(iter_num))
     if t == 0.0:
         t = 1.0
     return t, x, y
@@ -862,6 +944,30 @@ class UnitTest:
         return t
 
     @ti.kernel
+    def moving_sphere_slab(self, m: ti.any_arr(), m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), v: ti.any_arr(), v1: ti.any_arr(), v2: ti.any_arr(), v3: ti.any_arr()) -> ti.f32:
+        ti_m = ti.Vector([m[0], m[1], m[2], m[3]])
+        ti_m1 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
+        ti_m2 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
+        ti_m3 = ti.Vector([m3[0], m3[1], m3[2], m3[3]])
+        t = 0.0
+        t1, t2 = get_sphere_slab_nearest(ti_m, ti_m1, ti_m2, ti_m3)
+        if surface_distane(ti_m, bary_lerp(ti_m1, ti_m2, ti_m3, t1, t2)) <= 0.0:
+            print("Should start in an intersection free state!!!")
+        else:
+            _v = ti.Vector([v[0], v[1], v[2]])
+            _v1 = ti.Vector([v1[0], v1[1], v1[2]])
+            _v2 = ti.Vector([v2[0], v2[1], v2[2]])
+            _v3 = ti.Vector([v3[0], v3[1], v3[2]])
+            t, x, y = get_sphere_slab_toi(
+                ti_m, ti_m1, ti_m2, ti_m3, _v, _v1, _v2, _v3)
+            print("TOI:{}, x:{}, y:{}".format(t, x, y))
+            mt = advance_medial_sphere(ti_m, _v, t)
+            mst = bary_lerp(advance_medial_sphere(ti_m1, _v1, t), advance_medial_sphere(
+                ti_m2, _v2, t), advance_medial_sphere(ti_m3, _v3, t), x, y)
+            print("Surace Distance:{}".format(surface_distane(mt, mst)))
+        return t
+
+    @ti.kernel
     def cone_cone_performance(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), m4: ti.any_arr(), v11: ti.any_arr(), v12: ti.any_arr(), v21: ti.any_arr(), v22: ti.any_arr(), steps: ti.int32):
         m11 = ti.Vector([m1[0], m1[1], m1[2], m1[3]])
         m12 = ti.Vector([m2[0], m2[1], m2[2], m2[3]])
@@ -873,5 +979,5 @@ class UnitTest:
         _v22 = ti.Vector([v22[0], v22[1], v22[2]])
 
         for i in range(steps):
-            t, x, y = get_cone_cone_toi(
+            _, _, _ = get_cone_cone_toi(
                 m11, m12, m21, m22, _v11, _v12, _v21, _v22)
