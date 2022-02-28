@@ -423,6 +423,31 @@ def get_cone_slab_nearest(m11: ti.template(), m12: ti.template(), m21: ti.templa
     return t1, t2, t3
 
 
+@ti.func
+def get_slab_slab_nearest(m11: ti.template(), m12: ti.template(), m13: ti.template(), m21: ti.template(), m22: ti.template(), m23: ti.template()):
+    # m11*t1+m12*t2+m13*(1-t1-t2)
+    # m21*t3+m22*t4+m23*(1-t3-t4)
+    # m11m12 vs m21m22m23 t1+t2=1
+    t1, t3, t4 = get_cone_cone_nearest(m11, m12, m21, m22, m23)
+    t2 = 1.0 - t1
+    min_dis = surface_distane(linear_lerp(
+        m11, m12, t1), bary_lerp(m21, m22, m23, t3, t4))
+    # m11m13 vs m21m22m23 t2=0
+    a, b, c = get_cone_cone_nearest(m11, m13, m21, m22, m23)
+    dis = surface_distane(linear_lerp(m11, m12, a),
+                          bary_lerp(m21, m22, m23, b, c))
+    if dis < min_dis:
+        min_dis = dis
+        t1, t2, t3, t4 = a, 0.0, b, c
+    # m12m13 vs m21m22m23 t1=0
+    a, b, c = get_cone_cone_nearest(m12, m13, m21, m22, m23)
+    dis = surface_distane(linear_lerp(m12, m13, a),
+                          bary_lerp(m21, m22, m23, b, c))
+    if dis < min_dis:
+        t1, t2, t3, t4 = 0.0, a, b, c
+    return t1, t2, t3, t4
+
+
 ##################################
 ## Check Intersection Algorithm ##
 ##################################
@@ -942,6 +967,17 @@ class UnitTest:
         ti_m5 = ti.Vector([m5[0], m5[1], m5[2], m5[3]])
         self.t11[None], self.t21[None], self.t22[None] = get_cone_slab_nearest(
             ti_m1, ti_m2, ti_m3, ti_m4, ti_m5)
+
+    @ti.kernel
+    def unit_slab_slab(self, m11: ti.any_arr(), m12: ti.any_arr(), m13: ti.any_arr(), m21: ti.any_arr(), m22: ti.any_arr(), m23: ti.any_arr()):
+        tm11 = ti.Vector([m11[0], m11[1], m11[2], m11[3]])
+        tm12 = ti.Vector([m12[0], m12[1], m12[2], m12[3]])
+        tm13 = ti.Vector([m13[0], m13[1], m13[2], m13[3]])
+        tm21 = ti.Vector([m21[0], m21[1], m21[2], m21[3]])
+        tm22 = ti.Vector([m22[0], m22[1], m22[2], m22[3]])
+        tm23 = ti.Vector([m23[0], m23[1], m23[2], m23[3]])
+        self.t11[None], self.t12[None], self.t21[None], self.t22[None] = get_slab_slab_nearest(
+            tm11, tm12, tm13, tm21, tm22, tm23)
 
     @ti.kernel
     def proof_sphere_cone(self, m1: ti.any_arr(), m2: ti.any_arr(), m3: ti.any_arr(), steps: ti.i32):
