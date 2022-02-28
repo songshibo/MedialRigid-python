@@ -940,6 +940,71 @@ def get_cone_slab_toi(m11: ti.template(), m12: ti.template(), m21: ti.template()
 
 
 @ti.func
+def get_slab_slab_toi(m11: ti.template(), m12: ti.template(), m13: ti.template(), m21: ti.template(), m22: ti.template(), m23: ti.template(), v11: ti.template(), v12: ti.template(), v13: ti.template(), v21: ti.template(), v22: ti.template(), v23: ti.template()):
+    # m11 vs m21m22m23
+    t1, t2 = 1.0, 0.0
+    t, t3, t4 = get_sphere_slab_toi(m11, m21, m22, m23, v11, v21, v22, v23)
+    # m12 vs m21m22m23
+    _t, a, b = get_sphere_slab_toi(m12, m21, m22, m23, v12, v21, v22, v23)
+    if _t < t:
+        t, t1, t2, t3, t4 = _t, 0.0, 1.0, a, b
+    # m13 vs m21m22m23
+    _t, a, b = get_sphere_slab_toi(m13, m21, m22, m23, v13, v21, v22, v23)
+    if _t < t:
+        t, t1, t2, t3, t4 = _t, 0.0, 0.0, a, b
+    # m21 vs m11m12m13
+    _t, a, b = get_sphere_slab_toi(m21, m11, m12, m13, v21, v11, v12, v13)
+    if _t < t:
+        t, t1, t2, t3, t4 = _t, a, b, 1.0, 0.0
+    # m22 vs m11m12m13
+    _t, a, b = get_sphere_slab_toi(m22, m11, m12, m13, v22, v11, v12, v13)
+    if _t < t:
+        t, t1, t2, t3, t4 = _t, a, b, 0.0, 1.0
+    # m23 vs m11m12m13
+    _t, a, b = get_sphere_slab_toi(m23, m11, m12, m13, v23, v11, v12, v13)
+    if _t < t:
+        t, t1, t2, t3, t4 = _t, a, b, 0.0, 0.0
+    # m11m12 vs m21m22
+    _t, a, b = get_cone_cone_toi(m11, m12, m21, m22, v11, v12, v21, v22)
+    if _t < t:
+        t, t1, t2, t3, t4 = _t, a, 1.0-a, b, 1.0-b
+    # m11m12 vs m21m23
+    _t, a, b = get_cone_cone_toi(m11, m12, m21, m23, v11, v12, v21, v23)
+    if _t < t:
+        t, t1, t2, t3, t4 = _t, a, 1.0-a, b, 0.0
+    # m11m12 vs m22m23
+    _t, a, b = get_cone_cone_toi(m11, m12, m22, m23, v11, v12, v22, v23)
+    if _t < t:
+        t, t1, t2, t3, t4 = _t, a, 1.0-a, 0.0, b
+    # m11m13 vs m21m22
+    _t, a, b = get_cone_cone_toi(m11, m13, m21, m22, v11, v13, v21, v22)
+    if _t < t:
+        t, t1, t2, t3, t4 = _t, a, 0.0, b, 1.0-b
+    # m11m13 vs m21m23
+    _t, a, b = get_cone_cone_toi(m11, m13, m21, m23, v11, v13, v21, v23)
+    if _t < t:
+        t, t1, t2, t3, t4 = _t, a, 0.0, b, 0.0
+    # m11m13 vs m22m23
+    _t, a, b = get_cone_cone_toi(m11, m13, m22, m23, v11, v13, v22, v23)
+    if _t < t:
+        t, t1, t2, t3, t4 = _t, a, 0.0, 0.0, b
+    # m12m13 vs m21m22
+    _t, a, b = get_cone_cone_toi(m12, m13, m21, m22, v12, v13, v21, v22)
+    if _t < t:
+        t, t1, t2, t3, t4 = _t, 0.0, a, b, 1.0-b
+    # m12m13 vs m21m23
+    _t, a, b = get_cone_cone_toi(m12, m13, m21, m23, v12, v13, v21, v23)
+    if _t < t:
+        t, t1, t2, t3, t4 = _t, 0.0, a, b, 0.0
+    # m12m13 vs m22m23
+    _t, a, b = get_cone_cone_toi(m12, m13, m22, m23, v12, v13, v22, v23)
+    if _t < t:
+        t, t1, t2, t3, t4 = _t, 0.0, a, 0.0, b
+
+    return t, t1, t2, t3, t4
+
+
+@ti.func
 def get_cone_slab_toi_simple(m11: ti.template(), m12: ti.template(), m21: ti.template(), m22: ti.template(), m23: ti.template(), v11: ti.template(), v12: ti.template(), v21: ti.template(), v22: ti.template(), v23: ti.template()):
     t, x, y, z = 0.0, 1.0, -1.0, -1.0
     t, y, z = get_sphere_slab_toi(m11, m21, m22, m23, v11, v21, v22, v23)
@@ -1197,6 +1262,36 @@ class UnitTest:
                 m11t, m12t, x), linear_lerp(_v11, _v12, x), t)
             mst = advance_medial_sphere(
                 bary_lerp(m21t, m22t, m23t, y, z), bary_lerp(_v21, _v22, _v23, y, z), t)
+            print("Surace Distance:{}".format(surface_distane(mct, mst)))
+        return t
+
+    @ti.kernel
+    def moving_slab_slab(self, m11: ti.any_arr(), m12: ti.any_arr(), m13: ti.any_arr(), m21: ti.any_arr(), m22: ti.any_arr(), m23: ti.any_arr(), v11: ti.any_arr(), v12: ti.any_arr(), v13: ti.any_arr(), v21: ti.any_arr(), v22: ti.any_arr(), v23: ti.any_arr()) -> ti.f32:
+        m11t = ti.Vector([m11[0], m11[1], m11[2], m11[3]])
+        m12t = ti.Vector([m12[0], m12[1], m12[2], m12[3]])
+        m13t = ti.Vector([m13[0], m13[1], m13[2], m13[3]])
+        m21t = ti.Vector([m21[0], m21[1], m21[2], m21[3]])
+        m22t = ti.Vector([m22[0], m22[1], m22[2], m22[3]])
+        m23t = ti.Vector([m23[0], m23[1], m23[2], m23[3]])
+        t = 0.0
+        t1, t2, t3, t4 = get_slab_slab_nearest(
+            m11t, m12t, m13t, m21t, m22t, m23t)
+        if surface_distane(bary_lerp(m11t, m12t, m13t, t1, t2), bary_lerp(m21t, m22t, m23t, t3, t4)) <= 0.0:
+            print("Should start in an intersection free state!!!")
+        else:
+            _v11 = ti.Vector([v11[0], v11[1], v11[2]])
+            _v12 = ti.Vector([v12[0], v12[1], v12[2]])
+            _v13 = ti.Vector([v13[0], v13[1], v13[2]])
+            _v21 = ti.Vector([v21[0], v21[1], v21[2]])
+            _v22 = ti.Vector([v22[0], v22[1], v22[2]])
+            _v23 = ti.Vector([v23[0], v23[1], v23[2]])
+            t, x, y, z, w = get_slab_slab_toi(
+                m11t, m12t, m13t, m21t, m22t, m23t, _v11, _v12, _v13, _v21, _v22, _v23)
+            print("TOI:{}, x:{}, y:{}, z:{}, w:{}".format(t, x, y, z, w))
+            mct = advance_medial_sphere(
+                bary_lerp(m11t, m12t, m13t, x, y), bary_lerp(_v11, _v12, _v13, x, y), t)
+            mst = advance_medial_sphere(
+                bary_lerp(m21t, m22t, m23t, z, w), bary_lerp(_v21, _v22, _v23, z, w), t)
             print("Surace Distance:{}".format(surface_distane(mct, mst)))
         return t
 

@@ -131,7 +131,7 @@ global_t = 1.0
 
 
 def callback():
-    global m11, m12, m13, m21, m22, m23, v11, v12, v21, v22, v23, global_t, unit_test_selected, steps
+    global m11, m12, m13, m21, m22, m23, v11, v12, v13, v21, v22, v23, global_t, unit_test_selected, steps
 
     if psimgui.Button("Update from Scene"):
         m11 = decom_transform(ps.get_surface_mesh(
@@ -329,9 +329,30 @@ def callback():
         changed, v23 = psimgui.InputFloat3("V23", v23)
         if changed:
             generate_triangle_with_v("p2", m21, m22, m23, v21, v22, v23)
+    else:
+        changed, v11 = psimgui.InputFloat3("V11", v11)
+        if changed:
+            generate_triangle_with_v("p1",m11,m12,m13,v11,v12,v13)
+        changed, v12 = psimgui.InputFloat3("V12", v12)
+        if changed:
+            generate_triangle_with_v("p1",m11,m12,m13,v11,v12,v13)
+        changed, v13 = psimgui.InputFloat3("V13", v13)
+        if changed:
+            generate_triangle_with_v("p1", m11, m12, m13, v11, v12, v13)
+        changed, v21 = psimgui.InputFloat3("V21", v21)
+        if changed:
+            generate_triangle_with_v("p2", m21, m22, m23, v21, v22, v23)
+        changed, v22 = psimgui.InputFloat3("V22", v22)
+        if changed:
+            generate_triangle_with_v("p2", m21, m22, m23, v21, v22, v23)
+        changed, v23 = psimgui.InputFloat3("V23", v23)
+        if changed:
+            generate_triangle_with_v("p2", m21, m22, m23, v21, v22, v23)
+
 
     v11 = np.array(v11).astype(np.float32)
     v12 = np.array(v12).astype(np.float32)
+    v13 = np.array(v13).astype(np.float32)
     v21 = np.array(v21).astype(np.float32)
     v22 = np.array(v22).astype(np.float32)
     v23 = np.array(v23).astype(np.float32)
@@ -370,6 +391,21 @@ def callback():
             m23[:3] += v23 * toi
             TS(sp11, m11[:3], m11[3])
             TS(sp12, m12[:3], m12[3])
+            TS(sp21, m21[:3], m21[3])
+            TS(sp22, m22[:3], m22[3])
+            TS(sp23, m23[:3], m23[3])
+        elif unit_test_selected == "Slab-Slab":
+            toi = u_ins.moving_slab_slab(
+                m11, m12, m13, m21, m22, m23, v11, v12, v13, v21, v22, v23)
+            m11[:3] += v11 * toi
+            m12[:3] += v12 * toi
+            m13[:3] += v13 * toi
+            m21[:3] += v21 * toi
+            m22[:3] += v22 * toi
+            m23[:3] += v23 * toi
+            TS(sp11, m11[:3], m11[3])
+            TS(sp12, m12[:3], m12[3])
+            TS(sp13, m13[:3], m13[3])
             TS(sp21, m21[:3], m21[3])
             TS(sp22, m22[:3], m22[3])
             TS(sp23, m23[:3], m23[3])
