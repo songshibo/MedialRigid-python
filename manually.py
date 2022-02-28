@@ -83,13 +83,34 @@ cx = (c11 + v11 * t) * x + (c12 + v12 * t) * (1.0 - x)
 rx = r11 * x + r12 * (1.0-x)
 cyz = (c21 + v21 * t) * y + (c22 + v22 * t) * z + (c23 + v23 * t) * (1.0-y-z)
 ryz = r21 * y + r22 * z + r23 * (1.0-y-z)
-print(ts.sqrLength(cx-cyz))
-print(rx + ryz)
-print(surface_distane(cx, cyz, rx, ryz))
+# print(ts.sqrLength(cx-cyz))
+# print(rx + ryz)
+# print(surface_distane(cx, cyz, rx, ryz))
 
-x2, y2, z2, xy, xz, yz = x*x, y*y, z*z, x*y, x*z, y*z
-sc = (A1*x2+B1*y2+C1*z2+D1*xy+E1*xz+F1*yz+G1*x+H1*y+I1*z+J1) * t*t +\
-     (A2*x2+B2*y2+C2*z2+D2*xy+E2*xz+F2*yz+G2*x+H2*y+I2*z+J2) * t +\
-     (A3*x2+B3*y2+C3*z2+D3*xy+E3*xz+F3*yz+G3*x+H3*y+I3*z+J3)
-print(sc)
-print(R1*x+R2*y+R3*z+R4)
+# x2, y2, z2, xy, xz, yz = x*x, y*y, z*z, x*y, x*z, y*z
+# sc = (A1*x2+B1*y2+C1*z2+D1*xy+E1*xz+F1*yz+G1*x+H1*y+I1*z+J1) * t*t +\
+#      (A2*x2+B2*y2+C2*z2+D2*xy+E2*xz+F2*yz+G2*x+H2*y+I2*z+J2) * t +\
+#      (A3*x2+B3*y2+C3*z2+D3*xy+E3*xz+F3*yz+G3*x+H3*y+I3*z+J3)
+# print(sc)
+# print(R1*x+R2*y+R3*z+R4)
+
+m11 = np.array([0.0, 0.7, 0.5, 0.3])
+m11 = np.array([0.0, 0.7, 0.5, 0.3])
+v11 = np.array([0.0, -1.0, 0.0])
+m12 = np.array([0.0, 1.0, 0.0, 0.35])
+v12 = np.array([0.0, -0.5, 0.3])
+m13 = np.array([0.5, 0.7, -0.4, 0.25])
+v13 = np.array([0.0, -1.0, 0.0])
+# second
+m21 = np.array([0.5, 0.0, 0.0, 0.35])
+v21 = np.array([0.0, 0.0, 0.0])
+m22 = np.array([-0.5, 0.0, 0.0, 0.5])
+v22 = np.array([0.0, 0.0, 0.0])
+m23 = np.array([0.0, 0.0, -0.6, 0.2])
+v23 = np.array([0.0, 0.0, 0.0])
+t1, t2 = 0.7543255686759949, 0.24567443132400513
+t3, t4 = 0.36941203474998474, 0.6305879354476929
+m1 = m11 * t1 + m12 * t2 + m13 * (1-t1-t2)
+m2 = m21 * t3 + m22 * t3 + m23 * (1-t3-t4)
+print(np.linalg.norm(m1[:3]-m2[:3])-m1[3]-m2[3])
+# print(m1[3]+m2[3])

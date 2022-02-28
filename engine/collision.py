@@ -434,23 +434,44 @@ def get_slab_slab_nearest(m11: ti.template(), m12: ti.template(), m13: ti.templa
     # m11*t1+m12*t2+m13*(1-t1-t2)
     # m21*t3+m22*t4+m23*(1-t3-t4)
     # m11m12 vs m21m22m23 t1+t2=1
-    t1, t3, t4 = get_cone_cone_nearest(m11, m12, m21, m22, m23)
+    t1, t3, t4 = get_cone_slab_nearest(m11, m12, m21, m22, m23)
     t2 = 1.0 - t1
     min_dis = surface_distane(linear_lerp(
         m11, m12, t1), bary_lerp(m21, m22, m23, t3, t4))
     # m11m13 vs m21m22m23 t2=0
-    a, b, c = get_cone_cone_nearest(m11, m13, m21, m22, m23)
+    a, b, c = get_cone_slab_nearest(m11, m13, m21, m22, m23)
     dis = surface_distane(linear_lerp(m11, m12, a),
                           bary_lerp(m21, m22, m23, b, c))
     if dis < min_dis:
         min_dis = dis
         t1, t2, t3, t4 = a, 0.0, b, c
     # m12m13 vs m21m22m23 t1=0
-    a, b, c = get_cone_cone_nearest(m12, m13, m21, m22, m23)
+    a, b, c = get_cone_slab_nearest(m12, m13, m21, m22, m23)
     dis = surface_distane(linear_lerp(m12, m13, a),
                           bary_lerp(m21, m22, m23, b, c))
     if dis < min_dis:
+        min_dis = dis
         t1, t2, t3, t4 = 0.0, a, b, c
+    # m21m22 vs m11m12m13 t3+t4=1
+    a, b, c = get_cone_slab_nearest(m21, m22, m11, m12, m13)
+    dis = surface_distane(linear_lerp(m21, m22, a),
+                          bary_lerp(m11, m12, m13, b, c))
+    if dis < min_dis:
+        min_dis = dis
+        t1, t2, t3, t4 = b, c, a, 1.0-a
+    # m21m23 vs m11m12m13 t4=0
+    a, b, c = get_cone_slab_nearest(m21, m23, m11, m12, m13)
+    dis = surface_distane(linear_lerp(m21, m23, a),
+                          bary_lerp(m11, m12, m13, b, c))
+    if dis < min_dis:
+        min_dis = dis
+        t1, t2, t3, t4 = b, c, a, 0.0
+    # m22m23 vs m11m12m13 t3=0
+    a, b, c = get_cone_slab_nearest(m22, m23, m11, m12, m13)
+    dis = surface_distane(linear_lerp(m22, m23, a),
+                          bary_lerp(m11, m12, m13, b, c))
+    if dis < min_dis:
+        t1, t2, t3, t4 = b, c, 0.0, a
     return t1, t2, t3, t4
 
 
@@ -900,8 +921,8 @@ def get_cone_slab_toi(m11: ti.template(), m12: ti.template(), m21: ti.template()
 
         t_local, delta = find_cloeset_t(P1, P2, P3, Sr)
 
-        dis = surface_distane(linear_lerp(m11t, m12t, x),
-                              bary_lerp(m21t, m22t, m23t, y, z))
+        # dis = surface_distane(linear_lerp(m11t, m12t, x),
+        #                       bary_lerp(m21t, m22t, m23t, y, z))
         # print("dis:{}, x:{}, y:{}, z:{}, t_local:{}".format(dis, x, y, z, t_local))
         # print("P1:{},P2:{},P3:{},Sr:{} \n".format(P1, P2, P3, Sr))
         if abs(t - t_local) < 1e-5:
@@ -1081,6 +1102,26 @@ class UnitTest:
                 tm1 = linear_lerp(ti_m1, ti_m2, t1)
                 tm2 = bary_lerp(ti_m3, ti_m4, ti_m5, t2, t3)
                 dis = surface_distane(tm1, tm2)
+                ti.atomic_min(self.min_dis[None], dis)
+
+    @ti.kernel
+    def proof_slab_slab(self, m11: ti.any_arr(), m12: ti.any_arr(), m13: ti.any_arr(), m21: ti.any_arr(), m22: ti.any_arr(), m23: ti.any_arr(), steps: ti.i32):
+        tm11 = ti.Vector([m11[0], m11[1], m11[2], m11[3]])
+        tm12 = ti.Vector([m12[0], m12[1], m12[2], m12[3]])
+        tm13 = ti.Vector([m13[0], m13[1], m13[2], m13[3]])
+        tm21 = ti.Vector([m21[0], m21[1], m21[2], m21[3]])
+        tm22 = ti.Vector([m22[0], m22[1], m22[2], m22[3]])
+        tm23 = ti.Vector([m23[0], m23[1], m23[2], m23[3]])
+        self.min_dis[None] = 1000000.0
+        real_steps = min(steps, 500)
+        steps_f32 = ti.cast(real_steps-1, ti.f32)
+        for i, j in ti.ndrange(real_steps, real_steps):
+            t1, t3 = i / steps_f32, j / steps_f32
+            for l, m in ti.ndrange(real_steps, real_steps):
+                t2, t4 = (1.0 - t1) * l / steps_f32, (1-t3) * m / steps_f32
+                m1 = bary_lerp(tm11, tm12, tm13, t1, t2)
+                m2 = bary_lerp(tm21, tm22, tm23, t3, t4)
+                dis = surface_distane(m1, m2)
                 ti.atomic_min(self.min_dis[None], dis)
 
     @ti.kernel
