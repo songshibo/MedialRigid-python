@@ -1,15 +1,14 @@
-from os import PRIO_USER
 import taichi as ti
 import taichi_glsl as ts
 
 
 @ti.func
-def linear_lerp(v1: ti.template(), v2: ti.template(), t: ti.f32) -> ti.template():
+def linear_lerp(v1: ti.template(), v2: ti.template(), t: ti.f32):
     return v1 * t + v2 * (1.0-t)
 
 
 @ti.func
-def bary_lerp(v1: ti.template(), v2: ti.template(), v3: ti.template(), t1: ti.f32, t2: ti.f32) -> ti.template():
+def bary_lerp(v1: ti.template(), v2: ti.template(), v3: ti.template(), t1: ti.f32, t2: ti.f32):
     return v1 * t1 + v2 * t2 + v3 * (1.0 - t1 - t2)
 
 
@@ -53,6 +52,13 @@ def is_segement_intersect_with_triangle(e1, e2, A, B, C):
             intersected, t2, t3 = is_point_inside_triangle(point, A, B, C)
 
     return intersected, t1, t2, t3
+
+
+@ti.func
+def is_segements_parallel_to_triangle(c12c11, c23c21, c23c22):
+    c12c11_n = ts.normalize(c12c11)
+    normal = ts.normalize(ts.cross(c23c21, c23c22))
+    return ts.dot(c12c11_n, normal) == 0.0
 
 
 # solve Ax^2 + Bx + C = 0
@@ -610,7 +616,7 @@ def find_cloeset_t(P1, P2, P3, Sr):
             t = 0.0
         # else t = 1.0
     else:
-        t = ts.clamp((-P2 - ti.sqrt(delta)) / (2 * P1), 0.0, 1.0)
+        t = ts.clamp((-P2 - ti.sqrt(delta)) / (2.0 * P1), 0.0, 1.0)
     return t, delta
 
 
@@ -695,7 +701,7 @@ def get_cone_cone_toi(m11: ti.template(), m12: ti.template(), m21: ti.template()
         if abs(t - t_local) < 1e-5:
             if delta <= 0.0:
                 t = 1.0
-                break
+            break
 
         # dis = surface_distane(linear_lerp(m11t, m12t, x),
         #                       linear_lerp(m21t, m22t, y))
@@ -777,12 +783,12 @@ def get_sphere_slab_toi(m: ti.template(), m1: ti.template(), m2: ti.template(), 
         if abs(t - t_local) < 1e-5:
             if delta <= 0.0:
                 t = 1.0
-                break
+            break
 
         t = t_local  # next iteration
         iter_num += 1
 
-    print("Iterations:{}".format(iter_num))
+    # print("Iterations:{}".format(iter_num))
     if t == 0.0:
         t = 1.0
     return t, x, y
@@ -801,14 +807,17 @@ def get_cone_slab_toi(m11: ti.template(), m12: ti.template(), m21: ti.template()
     v12v23 = v12-v23
 
     # x^2
-    A1, A2, A3 = ts.sqrLength(v11v12), 2.0 * \
-        ts.dot(v11v12, c11c12), ts.sqrLength(c11c12)
+    A1 = ts.sqrLength(v11v12)
+    A2 = 2.0 * ts.dot(v11v12, c11c12)
+    A3 = ts.sqrLength(c11c12)
     # y^2
-    B1, B2, B3 = ts.sqrLength(v21v23), 2.0 * \
-        ts.dot(v21v23, c21c23), ts.sqrLength(c21c23)
+    B1 = ts.sqrLength(v21v23)
+    B2 = 2.0 * ts.dot(v21v23, c21c23)
+    B3 = ts.sqrLength(c21c23)
     # z^2
-    C1, C2, C3 = ts.sqrLength(v22v23), 2.0 * \
-        ts.dot(v22v23, c22c23), ts.sqrLength(c22c23)
+    C1 = ts.sqrLength(v22v23)
+    C2 = 2.0 * ts.dot(v22v23, c22c23)
+    C3 = ts.sqrLength(c22c23)
     # xy
     D1 = -2.0 * ts.dot(v11v12, v21v23)
     D2 = -2.0 * (ts.dot(v11v12, c21c23) + ts.dot(c11c12, v21v23))
@@ -841,39 +850,70 @@ def get_cone_slab_toi(m11: ti.template(), m12: ti.template(), m21: ti.template()
 
     t = 1.0
     x, y, z = -1.0, -1.0, -1.0
+    # return t, x, y, z
     iter_num = 0
-    while iter_num < 15:
+    while iter_num < 8:
         m11t = advance_medial_sphere(m11, v11, t)
         m12t = advance_medial_sphere(m12, v12, t)
         m21t = advance_medial_sphere(m21, v21, t)
         m22t = advance_medial_sphere(m22, v22, t)
         m23t = advance_medial_sphere(m23, v23, t)
 
+        # m1t = linear_lerp(m11t, m12t, x)
+        # m2t = bary_lerp(m21t, m22t, m23t, y, z)
+        # print(m1t)
+        # print(m2t)
+        # print("Last iter dis:{}".format(surface_distane(m1t, m2t)))
+
         x, y, z = get_cone_slab_nearest(m11t, m12t, m21t, m22t, m23t)
 
         x2, y2, z2, xy, xz, yz = x*x, y*y, z*z, x*y, x*z, y*z
         P1 = A1*x2+B1*y2+C1*z2+D1*xy+E1*xz+F1*yz+G1*x+H1*y+I1*z+J1
         P2 = A2*x2+B2*y2+C2*z2+D2*xy+E2*xz+F2*yz+G2*x+H2*y+I2*z+J2
-        P3 = A3*x2+B3*y2+C3*z2+D3*xy+E3*xz+F3*yz+G3*x+H3+y+I3*z+J3
+        P3 = A3*x2+B3*y2+C3*z2+D3*xy+E3*xz+F3*yz+G3*x+H3*y+I3*z+J3
         Sr = R1*x+R2*y+R3*z+R4
 
         t_local, delta = find_cloeset_t(P1, P2, P3, Sr)
 
         dis = surface_distane(linear_lerp(m11t, m12t, x),
                               bary_lerp(m21t, m22t, m23t, y, z))
-        print("dis:{}, x:{}, y:{}, z:{}, t_local:{}".format(dis, x, y, z, t_local))
+        # print("dis:{}, x:{}, y:{}, z:{}, t_local:{}".format(dis, x, y, z, t_local))
         # print("P1:{},P2:{},P3:{},Sr:{} \n".format(P1, P2, P3, Sr))
         if abs(t - t_local) < 1e-5:
             if delta <= 0.0:
                 t = 1.0
-                break
+            break
 
         t = t_local  # next iteration
         iter_num += 1
 
-    print("Iterations:{}".format(iter_num))
+    # print("Iterations:{}".format(iter_num))
     if t == 0.0:
         t = 1.0
+    return t, x, y, z
+
+
+@ti.func
+def get_cone_slab_toi_simple(m11: ti.template(), m12: ti.template(), m21: ti.template(), m22: ti.template(), m23: ti.template(), v11: ti.template(), v12: ti.template(), v21: ti.template(), v22: ti.template(), v23: ti.template()):
+    t, x, y, z = 0.0, 1.0, -1.0, -1.0
+    t, y, z = get_sphere_slab_toi(m11, m21, m22, m23, v11, v21, v22, v23)
+
+    _t, a, b = get_sphere_slab_toi(m12, m21, m22, m23, v12, v21, v22, v23)
+    if _t < t:
+        t, x, y, z = _t, 0.0, a, b
+
+    _t, a, b = get_cone_cone_toi(m11, m12, m21, m22, v11, v12, v21, v22)
+    if _t < t:
+        t, x, y, z = _t, a, b, 1.0-b
+
+    _t, a, b = get_cone_cone_toi(m11, m12, m21, m23, v11, v12, v21, v23)
+    if _t < t:
+        t, x, y, z = _t, a, b, 0.0
+
+    _t, a, b = get_cone_cone_toi(m11, m12, m22, m23, v11, v12, v22, v23)
+    if _t < t:
+        t, x, y, z = _t, a, 0.0, b
+
     return t, x, y, z
 
 
@@ -951,7 +991,7 @@ class UnitTest:
         self.min_dis[None] = 1000000.0
         self.t21[None] = 2.0
         for i in range(steps):
-            t = i / ti.cast(steps, ti.f32)
+            t = i / ti.cast(steps-1, ti.f32)
             m = linear_lerp(ti_m2, ti_m3, t)
             dis = surface_distane(ti_m1, m)
             ti.atomic_min(self.min_dis[None], dis)
@@ -981,8 +1021,8 @@ class UnitTest:
         self.min_dis[None] = 1000000.0
         real_steps = min(steps, 31620)
         for i, j in ti.ndrange(real_steps, real_steps):
-            t1, t2 = i / ti.cast(real_steps, ti.f32), j / \
-                ti.cast(real_steps, ti.f32)
+            t1, t2 = i / ti.cast(real_steps-1, ti.f32), j / \
+                ti.cast(real_steps-1, ti.f32)
             tm1 = linear_lerp(ti_m1, ti_m2, t1)
             tm2 = linear_lerp(ti_m3, ti_m4, t2)
             dis = surface_distane(tm1, tm2)
@@ -996,11 +1036,12 @@ class UnitTest:
         ti_m4 = ti.Vector([m4[0], m4[1], m4[2], m4[3]])
         ti_m5 = ti.Vector([m5[0], m5[1], m5[2], m5[3]])
         self.min_dis[None] = 1000000.0
-        real_steps = min(steps, 1000)
-        for i, j, k in ti.ndrange(real_steps, real_steps, real_steps):
-            t1, t2, t3 = i / ti.cast(real_steps, ti.f32), j / \
-                ti.cast(real_steps, ti.f32), k / ti.cast(real_steps, ti.f32)
-            if t2 + t3 <= 1.0:
+        real_steps = min(steps, 5000)
+        for i, j in ti.ndrange(real_steps, real_steps):
+            t1, t2 = i / ti.cast(real_steps-1, ti.f32), j / \
+                ti.cast(real_steps-1, ti.f32)
+            for k in range(real_steps):
+                t3 = (1.0-t2) * k / ti.cast(real_steps-1, ti.f32)
                 tm1 = linear_lerp(ti_m1, ti_m2, t1)
                 tm2 = bary_lerp(ti_m3, ti_m4, ti_m5, t2, t3)
                 dis = surface_distane(tm1, tm2)
