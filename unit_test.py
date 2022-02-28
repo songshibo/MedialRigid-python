@@ -8,7 +8,7 @@ from util import *
 from engine import *
 import taichi as ti
 
-ti.init(arch=ti.gpu, debug=True, kernel_profiler=True)
+ti.init(arch=ti.gpu, debug=False, advanced_optimization=False, kernel_profiler=True)
 
 
 def surface_distance(m1, m2):
@@ -412,9 +412,14 @@ def callback():
 
     psimgui.SameLine()
     if psimgui.Button("Performance of TOI"):
-        u_ins.cone_cone_performance(
-            m11, m12, m21, m22, v11, v12, v21, v22, steps)
-        ti.print_kernel_profile_info('trace')
+        if unit_test_selected == "Cone-Cone":
+            u_ins.cone_cone_performance(
+                m11, m12, m21, m22, v11, v12, v21, v22, steps)
+            ti.print_kernel_profile_info('trace')
+        elif unit_test_selected == "Slab-Slab":
+            u_ins.slab_slab_performance(
+                m11, m12, m13, m21, m22, m23, v11, v12, v13, v21, v22, v23)
+            ti.print_kernel_profile_info('trace')
         ti.clear_kernel_profile_info()
 
     _, global_t = psimgui.InputFloat(
