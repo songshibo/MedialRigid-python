@@ -359,13 +359,16 @@ def callback():
         ti.print_kernel_profile_info('trace')
         ti.clear_kernel_profile_info()
 
-    _, global_t = psimgui.InputFloat("advanced t", global_t)
+    _, global_t = psimgui.InputFloat(
+        "advanced t", global_t, 0.0001, 1.0, "%.6f")
     if psimgui.Button("Advance"):
         m11[:3] += v11 * global_t
+        m12[:3] += v12 * global_t
         m21[:3] += v21 * global_t
         m22[:3] += v22 * global_t
         m23[:3] += v23 * global_t
         TS(sp11, m11[:3], m11[3])
+        TS(sp12, m12[:3], m12[3])
         TS(sp21, m21[:3], m21[3])
         TS(sp22, m22[:3], m22[3])
         TS(sp23, m23[:3], m23[3])
