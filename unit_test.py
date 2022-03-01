@@ -1,4 +1,3 @@
-from numpy import uint
 import polyscope as ps
 import polyscope.imgui as psimgui
 import os
@@ -8,7 +7,8 @@ from util import *
 from engine import *
 import taichi as ti
 
-ti.init(arch=ti.gpu, debug=False, advanced_optimization=False, kernel_profiler=True)
+ti.init(arch=ti.gpu, debug=False,
+        advanced_optimization=False, kernel_profiler=True)
 
 
 def surface_distance(m1, m2):
@@ -332,10 +332,10 @@ def callback():
     else:
         changed, v11 = psimgui.InputFloat3("V11", v11)
         if changed:
-            generate_triangle_with_v("p1",m11,m12,m13,v11,v12,v13)
+            generate_triangle_with_v("p1", m11, m12, m13, v11, v12, v13)
         changed, v12 = psimgui.InputFloat3("V12", v12)
         if changed:
-            generate_triangle_with_v("p1",m11,m12,m13,v11,v12,v13)
+            generate_triangle_with_v("p1", m11, m12, m13, v11, v12, v13)
         changed, v13 = psimgui.InputFloat3("V13", v13)
         if changed:
             generate_triangle_with_v("p1", m11, m12, m13, v11, v12, v13)
@@ -348,7 +348,6 @@ def callback():
         changed, v23 = psimgui.InputFloat3("V23", v23)
         if changed:
             generate_triangle_with_v("p2", m21, m22, m23, v21, v22, v23)
-
 
     v11 = np.array(v11).astype(np.float32)
     v12 = np.array(v12).astype(np.float32)
@@ -418,7 +417,7 @@ def callback():
             ti.print_kernel_profile_info('trace')
         elif unit_test_selected == "Slab-Slab":
             u_ins.slab_slab_performance(
-                m11, m12, m13, m21, m22, m23, v11, v12, v13, v21, v22, v23)
+                m11, m12, m13, m21, m22, m23, v11, v12, v13, v21, v22, v23, steps)
             ti.print_kernel_profile_info('trace')
         ti.clear_kernel_profile_info()
 
