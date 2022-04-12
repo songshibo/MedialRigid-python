@@ -7,8 +7,7 @@ from util import *
 from engine import *
 import taichi as ti
 
-ti.init(arch=ti.gpu, debug=False,
-        advanced_optimization=False, kernel_profiler=True)
+ti.init(arch=ti.gpu, kernel_profiler=True)
 
 
 def surface_distance(m1, m2):
@@ -178,13 +177,15 @@ def callback():
     psimgui.Separator()
 
     psimgui.TextUnformatted("First Primitive")
-    changed, m11 = psimgui.InputFloat4("Medial Sphere11", m11)
+    changed, m11 = psimgui.InputFloat4(
+        "Medial Sphere11", m11, "%.6f")
     if changed:
         update_curve_network()
         TS(sp11, m11[:3], m11[3])
     if unit_test_selected == "Cone-Cone" or unit_test_selected == "Cone-Slab" or unit_test_selected == "Slab-Slab":
         sp12.set_enabled(True)
-        changed, m12 = psimgui.InputFloat4("Medial Sphere12", m12)
+        changed, m12 = psimgui.InputFloat4(
+            "Medial Sphere12", m12, "%.6f")
         if changed:
             update_curve_network()
             TS(sp12, m12[:3], m12[3])
@@ -192,7 +193,8 @@ def callback():
         sp12.set_enabled(False)
     if unit_test_selected == "Slab-Slab":
         sp13.set_enabled(True)
-        changed, m13 = psimgui.InputFloat4("Medial Sphere13", m13)
+        changed, m13 = psimgui.InputFloat4(
+            "Medial Sphere13", m13, "%.6f")
         if changed:
             update_curve_network()
             TS(sp13, m13[:3], m13[3])
@@ -201,17 +203,20 @@ def callback():
 
     psimgui.Separator()
     psimgui.TextUnformatted("Second Primitive")
-    changed, m21 = psimgui.InputFloat4("Medial Sphere21", m21)
+    changed, m21 = psimgui.InputFloat4(
+        "Medial Sphere21", m21, "%.6f")
     if changed:
         update_curve_network()
         TS(sp21, m21[:3], m21[3])
-    changed, m22 = psimgui.InputFloat4("Medial Sphere22", m22)
+    changed, m22 = psimgui.InputFloat4(
+        "Medial Sphere22", m22, "%.6f")
     if changed:
         update_curve_network()
         TS(sp22, m22[:3], m22[3])
     if unit_test_selected == "Sphere-Slab" or unit_test_selected == "Cone-Slab" or unit_test_selected == "Slab-Slab":
         sp23.set_enabled(True)
-        changed, m23 = psimgui.InputFloat4("Medial Sphere23", m23)
+        changed, m23 = psimgui.InputFloat4(
+            "Medial Sphere23", m23, "%.6f")
         if changed:
             update_curve_network()
             TS(sp23, m23[:3], m23[3])
@@ -242,6 +247,8 @@ def callback():
             u_ins.unit_cone_cone(m11, m12, m21, m22)
             tm1 = m11 * u_ins.t11[None] + m12 * (1.0 - u_ins.t11[None])
             tm2 = m21 * u_ins.t21[None] + m22 * (1.0 - u_ins.t21[None])
+            print(tm1)
+            print(tm2)
             generate_edge("Nearest", tm1, tm2)
             print("[Medial-Rigid] linear t1,t2:{},{}".format(
                 u_ins.t11[None], u_ins.t21[None]))
@@ -426,11 +433,13 @@ def callback():
     if psimgui.Button("Advance"):
         m11[:3] += v11 * global_t
         m12[:3] += v12 * global_t
+        m13[:3] += v13 * global_t
         m21[:3] += v21 * global_t
         m22[:3] += v22 * global_t
         m23[:3] += v23 * global_t
         TS(sp11, m11[:3], m11[3])
         TS(sp12, m12[:3], m12[3])
+        TS(sp13, m13[:3], m13[3])
         TS(sp21, m21[:3], m21[3])
         TS(sp22, m22[:3], m22[3])
         TS(sp23, m23[:3], m23[3])

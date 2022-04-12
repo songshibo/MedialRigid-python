@@ -2,6 +2,7 @@ import igl
 import os
 from util import *
 from .mass_property import *
+import time
 
 
 def compute_bouding_box(v, _scale):
@@ -63,6 +64,7 @@ class MeshObject:
         print("{} is re-tetrahedralized".format(self.name))
 
     def compute_mass_properties(self, VT, TT):
+        start_time = time.time()
         vol = igl.volume(VT, TT)
         total_V = np.sum(np.absolute(vol))
         print("[{}]\n   original total volume: {}".format(self.name, total_V))
@@ -74,7 +76,7 @@ class MeshObject:
             density = self.mass / total_V
         self.mass_center = compute_mass_center_with_tet(VT, TT, vol, total_V)
         print("   mass center: {}".format(self.mass_center))
-
+        print("--- %.2f seconds ---" % (time.time() - start_time))
         self.inertia = compute_inertia_tensor_with_tet(
             VT, TT, self.mass_center, density)
 
