@@ -51,13 +51,26 @@ for obj_name in scene_config.sections():
 print("\nInitialize simulator backends...")
 sim = Simulator(0.01, objects)
 
+auto = False
+
 
 def callback():
+    global auto
     psimgui.PushItemWidth(150)
 
     if(psimgui.Button("Advance")):
         sim.update()
         # read back to polyscope
+        result = sim.rigidbodies.to_numpy()
+        for obj in objects:
+            obj.update_transform(result)
+
+    if(psimgui.Button("Auto")):
+        auto = not auto
+        print("Auto Sim:{}".format(auto))
+
+    if auto:
+        sim.update()
         result = sim.rigidbodies.to_numpy()
         for obj in objects:
             obj.update_transform(result)
@@ -98,6 +111,7 @@ def callback():
         psimgui.PopItemWidth()
 
 
-ps.init()
-ps.set_user_callback(callback)
-ps.show()
+if __name__ == "__main__":
+    ps.init()
+    ps.set_user_callback(callback)
+    ps.show()
