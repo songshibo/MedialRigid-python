@@ -1,4 +1,5 @@
 import taichi as ti
+import taichi.math as tm
 import taichi_glsl as ts
 
 
@@ -664,94 +665,6 @@ def find_cloeset_t(P1, P2, P3, Sr):
     else:
         t = ts.clamp((-P2 - ti.sqrt(delta)) / (2.0 * P1), 0.0, 1.0)
     return t, delta
-
-
-@ti.func
-def slab_slab_cond1(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, R1, R2, R3, R4):
-    t1, t2, t3, t4 = -1.0, -1.0, -1.0, -1.0
-    K1_ = 2.0*A1*R2 - A5 * R1
-    K2_ = A6 * R2 - A8 * R1
-    K3_ = A7 * R2 - A9 * R1
-    K4_ = A11 * R2 - A12 * R1
-    K5_ = A5 * R2 - 2.0*A2*R1
-
-    if K5_ != 0.0:
-        K1_ = -K1_ / K5_
-        K2_ = -K2_ / K5_
-        K3_ = -K3_ / K5_
-        K4_ = -K4_ / K5_
-        H1_ = (2.0*A1 + A5 * K1_)*R3 - (A6 + A8 * K1_)*R1
-        H2_ = (A7 + A5 * K3_)*R3 - (A10 + A8 * K3_)*R1
-        H3_ = (A11 + A5 * K4_)*R3 - (A13 + A8 * K4_)*R1
-        H4_ = (A6 + A5 * K2_)*R3 - (2.0*A3 + A8 * K2_)*R1
-
-        if H4_ != 0.0:
-            H1_ = -H1_ / H4_
-            H2_ = -H2_ / H4_
-            H3_ = -H3_ / H4_
-            G1 = (2.0*A1 + A5 * K1_ + (A6 + A5 * K2_)*H1_) * \
-                R4 - (A7 + A9 * K1_ + (A10 + A9 * K2_)*H1_)*R1
-            G2 = (A11 + A5 * K4_ + (A6 + A5 * K2_)*H3_)*R4 - \
-                (A14 + A9 * K4_ + (A10 + A9 * K2_)*H3_)*R1
-            G3 = (A7 + A5 * K3_ + (A6 + A5 * K2_)*H2_)*R4 - \
-                (2.0*A4 + A9 * K3_ + (A10 + A9 * K2_)*H2_)*R1
-
-            if G3 != 0.0:
-                G1 = -1.0*G1 / G3
-                G2 = -1.0*G2 / G3
-                K1 = K1_ + K2_ * H1_ + K2_ * H2_*G1 + K3_ * G1
-                K2 = K4_ + K2_ * H2_*G2 + K2_ * H3_ + K3_ * G2
-                H1 = H1_ + H2_ * G1
-                H2 = H3_ + H2_ * G2
-
-                # W1 t1^2 + W2 t1 + W3 = 0
-                W1 = pow((2.0*A1 + A5 * K1 + A6 * H1 + A7 * G1), 2.0) - 4.0*R1*R1*(A1 + A2 * K1*K1 + A3 *
-                                                                                   H1*H1 + A4 * G1*G1 + A5 * K1 + A6 * H1 + A7 * G1 + A8 * K1*H1 + A9 * K1*G1 + A10 * H1*G1)
-                W2 = 2.0*(2.0*A1 + A5 * K1 + A6 * H1 + A7 * G1)*(A11 + A5 * K2 + A6 * H2 + A7 * G2) - 4.0*R1*R1*(2.0*A2*K1*K2 + 2.0*A3*H1*H2 + 2.0*A4*G1*G2 + A5 *
-                                                                                                                 K2 + A6 * H2 + A7 * G2 + A8 * K1*H2 + A8 * K2*H1 + A9 * K1*G2 + A9 * K2*G1 + A10 * H1*G2 + A10 * H2*G1 + A11 + A12 * K1 + A13 * H1 + A14 * G1)
-                W3 = pow((A11 + A5 * K2 + A6 * H2 + A7 * G2), 2.0) - 4.0*R1*R1*(A2*K2*K2 + A3 * H2*H2 +
-                                                                                A4 * G2*G2 + A8 * K2*H2 + A9 * K2*G2 + A10 * H2*G2 + A12 * K2 + A13 * H2 + A14 * G2 + A15)
-                det = max(W2 * W2 - 4.0*W1*W3, 0.0)
-
-                if not (W1 == 0.0 and W2 == 0.0 and W3 == 0.0):
-                    if W1 != 0.0:
-                        t1 = (-1.0 * W2 - ti.sqrt(det)) / (2.0*W1)
-                    elif W2 != 0.0:
-                        t1 = -1.0 * W3 / W2
-                    else:
-                        t1 = -1.0
-                    t2 = K1 * t1 + K2
-                    t3 = H1 * t1 + H2
-                    t4 = G1 * t1 + G2
-            else:
-                L1 = 0.0
-                L2 = -1.0*G2 / G1
-                K1 = K1_ * L1 + K2_ * H1_ + K2_ * L1*H2_ + K3_
-                K2 = K1_ * L2 + K2_ * H2_*L2 + K2_ * H3_ + K4_
-                H1 = H1_ + L1 * H2_
-                H2 = H3_ + L2 * H2_
-                # W1 t4^2 + W2 t4 + W3 = 0
-                W1 = pow((A6*L1 + A8 * K1 + 2.0*A3*H1 + A10), 2.0) - 4.0*R4*R4*(A1*L1*L1 + A2 * K1*K1 +
-                                                                                A3 * H1*H1 + A4 + A5 * L1*K1 + A6 * L1*H1 + A7 * L1 + A8 * K1*H1 + A9 * K1 + A10 * H1)
-                W2 = 2.0*(A6*L1 + A8 * K1 + 2.0*A3*H1 + A10)*(A6*L2 + A8 * K2 + 2.0*A3*H2 + A13) - 4.0*R4*R4*(2.0*A1*L1*L2 + 2.0*A2*K1*K2 + 2.0*A3*H1*H2 + A5 *
-                                                                                                              L1*K2 + A5 * L2*K1 + A6 * L1*H2 + A6 * L2*H1 + A7 * L2 + A8 * K1*H2 + A8 * K2*H1 + A9 * K2 + A10 * H2 + A11 * L1 + A12 * K1 + A13 * H1 + A14)
-                W3 = pow((A6*L2 + A8 * K2 + 2.0*A3*H2 + A13), 2.0) - 4.0*R4*R4*(A1*L2*L2 + A2 * K2*K2 +
-                                                                                A3 * H2*H2 + A5 * L2*K2 + A6 * L2*H2 + A8 * K2*H2 + A11 * L2 + A12 * K2 + A13 * H2 + A15)
-                det = max(W2 * W2 - 4.0*W1*W3, 0.0)
-
-                if not (W1 == 0.0 and W2 == 0.0 and W3 == 0.0):
-                    if W1 != 0.0:
-                        t4 = (-1.0*W2 - ti.sqrt(det)) / (2.0*W1)
-                    elif W2 != 0.0:
-                        t4 = -1.0*W3 / W2
-                    else:
-                        t4 = -1.0
-
-                    t1 = L1 * t4 + L2
-                    t2 = K1 * t4 + K2
-                    t3 = H1 * t4 + H2
-        else:
-            pass
 
 
 @ti.func
