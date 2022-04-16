@@ -189,7 +189,8 @@ def cg():
         add(r0, r0, -alpha, q)
         r_2 = r_2_new
         r_2_new = dot(r0, r0)
-        if r_2_new <= r_2_init * epsilon**2: break
+        if r_2_new <= r_2_init * epsilon**2:
+            break
         beta = r_2_new / r_2
         add(d, r0, beta, d)
     f.fill(0)
@@ -237,8 +238,10 @@ def check(u):
     for i in ti.static(range(3)):
         k = rest % n_cube[2 - i]
         rest = rest // n_cube[2 - i]
-        if k == 0: ans |= (1 << (i * 2))
-        if k == n_cube[2 - i] - 1: ans |= (1 << (i * 2 + 1))
+        if k == 0:
+            ans |= (1 << (i * 2))
+        if k == n_cube[2 - i] - 1:
+            ans |= (1 << (i * 2 + 1))
     return ans
 
 
@@ -289,9 +292,9 @@ if __name__ == '__main__':
 
     if args.gui == 'ggui':
         res = (800, 600)
-        window = ti.ui.Window("Implicit FEM", res, vsync=True)
+        window = ti.ui.Window("Implicit FEM", res, vsync=False)
 
-        frame_id = 0
+        # frame_id = 0
         canvas = window.get_canvas()
         scene = ti.ui.Scene()
         camera = ti.ui.make_camera()
@@ -315,8 +318,8 @@ if __name__ == '__main__':
             canvas.scene(scene)
 
         while window.running:
-            frame_id += 1
-            frame_id = frame_id % 256
+            # frame_id += 1
+            # frame_id = frame_id % 256
             substep()
             if window.is_pressed('r'):
                 init()
@@ -345,7 +348,8 @@ if __name__ == '__main__':
         while gui.running:
             substep()
             if gui.get_event(ti.GUI.PRESS):
-                if gui.event.key in [ti.GUI.ESCAPE, ti.GUI.EXIT]: break
+                if gui.event.key in [ti.GUI.ESCAPE, ti.GUI.EXIT]:
+                    break
             if gui.is_pressed('r'):
                 init()
             gui.clear(0x000000)

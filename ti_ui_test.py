@@ -13,7 +13,7 @@ if _ti_core.GGUI_AVAILABLE:
 else:
     gui_type = 'cpu'
 
-v, f = igl.read_triangle_mesh("models/armadillo.obj")
+v, f = igl.read_triangle_mesh("models/unit_sphere.obj")
 print("vertices: {}\nfaces: {}".format(len(v), len(f)))
 
 x = ti.Vector.field(3, dtype=ti.f32, shape=len(v))
@@ -54,18 +54,20 @@ if __name__ == '__main__':
             scene.point_light(pos=(0.5, 10.0, 0.5), color=(0.5, 0.5, 0.5))
             scene.point_light(pos=(10.0, 10.0, 10.0), color=(0.5, 0.5, 0.5))
 
-            update(position[0])
-            # scene.mesh(ox, indices, color=(0.73, 0.33, 0.23))
-            scene.particles(x, radius=0.01)
+            scene.mesh(x, indices, color=(0.73, 0.33, 0.23))
+            # scene.particles(x, radius=0.01)
 
             canvas.scene(scene)
 
         while window.running:
-            window.GUI.begin("Simulator Parameters", 0.01, 0.01, 0.5, 0.4)
-            position[0].x = window.GUI.slider_float("X", position[0].x, -1, 1)
-            position[0].y = window.GUI.slider_float("Y", position[0].y, -1, 1)
-            position[0].z = window.GUI.slider_float("Z", position[0].z, -1, 1)
-            window.GUI.end()
+            # window.GUI.begin("Simulator Parameters", 0.01, 0.01, 0.5, 0.4)
+            # position[0].x = window.GUI.slider_float("X", position[0].x, -1, 1)
+            # position[0].y = window.GUI.slider_float("Y", position[0].y, -1, 1)
+            # position[0].z = window.GUI.slider_float("Z", position[0].z, -1, 1)
+            # window.GUI.end()
+
+            update(position[0])
+
             render()
             window.show()
     else:
