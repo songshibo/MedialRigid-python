@@ -1,10 +1,8 @@
-from turtle import pos
-from numpy import dtype
 import taichi as ti
 from taichi._lib import core as _ti_core
 import igl
 
-ti.init(arch=ti.gpu)
+ti.init(arch=ti.cuda)
 
 gui_type = 'auto'
 
@@ -13,23 +11,23 @@ if _ti_core.GGUI_AVAILABLE:
 else:
     gui_type = 'cpu'
 
-v, f = igl.read_triangle_mesh("models/unit_sphere.obj")
+v, f = igl.read_triangle_mesh("models/armadillo.obj")
 print("vertices: {}\nfaces: {}".format(len(v), len(f)))
 
 x = ti.Vector.field(3, dtype=ti.f32, shape=len(v))
 ox = ti.Vector.field(3, dtype=ti.f32, shape=len(v))
 indices_lens = 3 * len(f)
 indices = ti.field(dtype=ti.i32, shape=indices_lens)
-ox.from_numpy(v)
+x.from_numpy(v)
 indices.from_numpy(f.reshape(indices_lens))
 
 position = ti.Vector.field(3, ti.f32, shape=1)
 
 
 @ti.kernel
-def update(trans: ti.template()):
+def update():
     for u in x:
-        x[u] = ox[u] + trans
+        x[u] += ti.Vector([0.2, 0.0, 0.0]) * 0.01
 
 
 if __name__ == '__main__':
@@ -60,13 +58,13 @@ if __name__ == '__main__':
             canvas.scene(scene)
 
         while window.running:
-            # window.GUI.begin("Simulator Parameters", 0.01, 0.01, 0.5, 0.4)
-            # position[0].x = window.GUI.slider_float("X", position[0].x, -1, 1)
-            # position[0].y = window.GUI.slider_float("Y", position[0].y, -1, 1)
-            # position[0].z = window.GUI.slider_float("Z", position[0].z, -1, 1)
-            # window.GUI.end()
+            window.GUI.begin("Simulator Parameters", 0.01, 0.01, 0.5, 0.4)
+            position[0].x = window.GUI.slider_float("X", position[0].x, -1, 1)
+            position[0].y = window.GUI.slider_float("Y", position[0].y, -1, 1)
+            position[0].z = window.GUI.slider_float("Z", position[0].z, -1, 1)
+            window.GUI.end()
 
-            update(position[0])
+            update()
 
             render()
             window.show()
