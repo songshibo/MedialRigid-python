@@ -18,7 +18,7 @@ x = ti.Vector.field(3, dtype=ti.f32, shape=len(v))
 ox = ti.Vector.field(3, dtype=ti.f32, shape=len(v))
 indices_lens = 3 * len(f)
 indices = ti.field(dtype=ti.i32, shape=indices_lens)
-x.from_numpy(v)
+ox.from_numpy(v)
 indices.from_numpy(f.reshape(indices_lens))
 
 position = ti.Vector.field(3, ti.f32, shape=1)
@@ -27,7 +27,7 @@ position = ti.Vector.field(3, ti.f32, shape=1)
 @ti.kernel
 def update():
     for u in x:
-        x[u] += ti.Vector([0.2, 0.0, 0.0]) * 0.01
+        x[u] = ox[u] + position[0]
 
 
 if __name__ == '__main__':
