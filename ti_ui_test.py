@@ -4,7 +4,7 @@ import taichi as ti
 from taichi._lib import core as _ti_core
 import igl
 
-ti.init(arch=ti.gpu, dynamic_index=True)
+ti.init(arch=ti.gpu)
 
 gui_type = 'auto'
 
