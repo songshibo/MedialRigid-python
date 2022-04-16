@@ -25,6 +25,7 @@ ps.set_program_name(ps_config['options']['prog_name'])
 ps.set_print_prefix(ps_config['options']['print_prefix'])
 ps.set_max_fps(ps_config.getint('options', 'max_fps'))
 ps.set_autoscale_structures(ps_config.getboolean('options', 'autoscale'))
+ps.set_always_redraw(ps_config.getboolean('options','always_draw'))
 # scene
 ps.set_automatically_compute_scene_extents(
     ps_config.getboolean('scene', 'auto_compute_scene_extents'))

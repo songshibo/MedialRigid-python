@@ -13,7 +13,7 @@ if _ti_core.GGUI_AVAILABLE:
 else:
     gui_type = 'cpu'
 
-v, f = igl.read_triangle_mesh("models/unit_cube.obj")
+v, f = igl.read_triangle_mesh("models/armadillo.obj")
 print("vertices: {}\nfaces: {}".format(len(v), len(f)))
 
 x = ti.Vector.field(3, dtype=ti.f32, shape=len(v))
@@ -54,8 +54,9 @@ if __name__ == '__main__':
             scene.point_light(pos=(0.5, 10.0, 0.5), color=(0.5, 0.5, 0.5))
             scene.point_light(pos=(10.0, 10.0, 10.0), color=(0.5, 0.5, 0.5))
 
-            # update(ti.Vector([0, 0, 0]))
-            scene.mesh(ox, indices, color=(0.73, 0.33, 0.23))
+            update(position[0])
+            # scene.mesh(ox, indices, color=(0.73, 0.33, 0.23))
+            scene.particles(x, radius=0.01)
 
             canvas.scene(scene)
 
