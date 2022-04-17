@@ -58,7 +58,7 @@ if __name__ == '__main__':
             canvas.scene(scene)
 
         while window.running:
-            window.GUI.begin("Simulator Parameters", 0.01, 0.01, 0.5, 0.4)
+            window.GUI.begin("Simulator Parameters", 0.01, 0.01, 0.3, 0.4)
             position[0].x = window.GUI.slider_float("X", position[0].x, -1, 1)
             position[0].y = window.GUI.slider_float("Y", position[0].y, -1, 1)
             position[0].z = window.GUI.slider_float("Z", position[0].z, -1, 1)
